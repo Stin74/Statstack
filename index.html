@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StatStack — Daily Baseball Puzzle</title>
+  <meta name="description" content="Pick 3 players per stat whose all-time ranks sum to the target number. A new puzzle every day.">
+  <meta property="og:title" content="StatStack">
+  <meta property="og:description" content="Daily baseball stats puzzle. Pick 3 career leaders whose ranks sum to the target.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0C1221;
+      --surface:   #131D2E;
+      --surface2:  #1A2640;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.14);
+      --blue:      #2080D0;
+      --gold:      #E8C06A;
+      --text:      #E8EFF7;
+      --text2:     #7B90A8;
+      --text3:     #3D5066;
+      --green:     #4ADE80;
+      --yellow:    #FDE047;
+      --orange:    #FB923C;
+      --red:       #F87171;
+      --font-cond: 'Barlow Condensed', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --radius:    6px;
+      --radius-lg: 10px;
+    }
+
+    html { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+    body { min-height: 100vh; }
+
+    /* ── Layout ─────────────────────────────────── */
+    #app   { max-width: 740px; margin: 0 auto; padding: 20px 14px 60px; }
+    #loading, #error-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 60vh; gap: 16px; text-align: center;
+    }
+    .loading-label { font-family: var(--font-cond); font-size: 15px; letter-spacing: 2px; color: var(--text2); text-transform: uppercase; }
+    .error-msg { color: var(--text2); max-width: 380px; line-height: 1.6; }
+    .error-msg code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+
+    /* ── Header ─────────────────────────────────── */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 16px; margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-family: var(--font-cond); font-weight: 700; font-size: 26px;
+      letter-spacing: 1px; color: var(--text);
+    }
+    .logo span { color: var(--gold); }
+    .header-right { display: flex; align-items: center; gap: 14px; }
+    .sport-badge {
+      font-family: var(--font-cond); font-size: 12px; font-weight: 600;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 99px;
+      border: 1px solid rgba(32,128,208,0.5);
+      color: var(--blue); background: rgba(32,128,208,0.08);
+    }
+    .date-label { font-size: 12px; color: var(--text3); }
+
+    /* ── Magic number strip ─────────────────────── */
+    .target-strip {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 12px 18px; margin-bottom: 14px;
+    }
+    .target-left { display: flex; align-items: baseline; gap: 10px; }
+    .target-label { font-size: 12px; color: var(--text2); letter-spacing: .5px; }
+    .target-num {
+      font-family: var(--font-cond); font-size: 38px; font-weight: 700;
+      color: var(--gold); line-height: 1;
+    }
+    .target-tip { font-size: 12px; color: var(--text3); max-width: 260px; text-align: right; line-height: 1.5; }
+
+    /* ── Info / error banner ─────────────────────── */
+    .info-bar {
+      font-size: 13px; padding: 8px 14px; border-radius: var(--radius);
+      margin-bottom: 10px; text-align: center;
+    }
+    .info-bar.err { background: rgba(248,113,113,0.12); color: var(--red); }
+    .info-bar.ok  { background: rgba(74,222,128,0.10); color: var(--green); }
+
+    /* ── Board ──────────────────────────────────── */
+    .board-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .board {
+      min-width: 520px; border: 1px solid var(--border);
+      border-radius: var(--radius-lg); background: var(--surface);
+      overflow: visible;
+    }
+    .col-hdr {
+      display: grid; grid-template-columns: 110px 1fr 1fr 1fr 88px;
+      border-bottom: 1px solid var(--border); padding: 8px 0;
+    }
+    .col-hdr span {
+      font-family: var(--font-cond); font-size: 11px; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--text3); text-align: center;
+    }
+    .col-hdr span:first-child  { text-align: left; padding-left: 14px; }
+    .col-hdr span:last-child   { text-align: center; }
+
+    /* Row */
+    .row {
+      display: grid; grid-template-columns: 110px 1fr 1fr 1fr 88px;
+      border-bottom: 1px solid var(--border);
+      align-items: stretch; position: relative; overflow: visible;
+    }
+    .row:last-child { border-bottom: none; }
+    .row-label {
+      font-family: var(--font-cond); font-size: 13px; font-weight: 600;
+      color: var(--text2); padding: 10px 10px 10px 14px;
+      display: flex; align-items: center; line-height: 1.3;
+    }
+
+    /* Cell */
+    .cell { padding: 6px 5px; position: relative; overflow: visible; }
+
+    /* Empty slot */
+    .slot {
+      height: 48px; border-radius: var(--radius);
+      border: 1px dashed var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: border-color .15s, background .15s;
+      color: var(--text3);
+    }
+    .slot:hover { border-color: var(--blue); color: var(--blue); background: rgba(32,128,208,0.05); }
+    .slot-icon { font-size: 18px; line-height: 1; user-select: none; }
+
+    /* Filled chip */
+    .chip {
+      height: 48px; border-radius: var(--radius);
+      border: 1px solid var(--border2); padding: 5px 8px;
+      display: flex; flex-direction: column; justify-content: center;
+      cursor: pointer; transition: border-color .15s, background .15s; overflow: hidden;
+    }
+    .chip:hover { border-color: rgba(255,255,255,0.25); background: var(--surface2); }
+    .chip-name {
+      font-size: 11px; font-weight: 500; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; color: var(--text);
+    }
+    .chip-rank { font-family: var(--font-cond); font-size: 13px; margin-top: 1px; }
+
+    /* Input + autocomplete */
+    .iw { position: relative; overflow: visible; }
+    .iw input {
+      width: 100%; height: 48px; padding: 0 10px;
+      border-radius: var(--radius); border: 1.5px solid var(--blue);
+      background: var(--surface2); color: var(--text);
+      font-family: var(--font-body); font-size: 13px;
+      outline: none;
+    }
+    .iw input::placeholder { color: var(--text3); }
+    .ac-drop {
+      position: absolute; top: calc(100% + 3px); left: 0; min-width: 260px;
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: var(--radius); z-index: 999; overflow: hidden;
+    }
+    .ac-item {
+      padding: 9px 13px; font-size: 13px; cursor: pointer; color: var(--text);
+      white-space: nowrap; transition: background .1s;
+    }
+    .ac-item:hover, .ac-item.hi { background: var(--surface); color: #fff; }
+    .ac-none { padding: 9px 13px; font-size: 13px; color: var(--text3); }
+
+    /* Sum column */
+    .sum-cell {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 8px 6px; border-left: 1px solid var(--border);
+    }
+    .sum-num { font-family: var(--font-cond); font-size: 22px; font-weight: 700; line-height: 1; }
+    .sum-pen { font-size: 11px; margin-top: 2px; }
+
+    /* ── Score footer ────────────────────────────── */
+    .score-footer {
+      margin-top: 16px; border: 1px solid var(--border);
+      border-radius: var(--radius-lg); background: var(--surface);
+      padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .score-footer.incomplete { justify-content: center; }
+    .score-label { font-size: 12px; color: var(--text2); letter-spacing: .5px; margin-bottom: 2px; }
+    .score-num {
+      font-family: var(--font-cond); font-size: 48px; font-weight: 700;
+      line-height: 1;
+    }
+    .score-sub { font-size: 12px; color: var(--text3); margin-top: 3px; }
+    .score-tip { font-size: 12px; color: var(--text3); text-align: center; }
+
+    /* Share button */
+    .share-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 11px 22px; border-radius: var(--radius);
+      border: 1px solid var(--border2); background: transparent;
+      color: var(--text); font-family: var(--font-body); font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: background .15s, border-color .15s;
+    }
+    .share-btn:hover { background: var(--surface2); border-color: rgba(255,255,255,0.25); }
+    .share-btn svg { width: 16px; height: 16px; }
+
+    /* How to play */
+    .howto-toggle {
+      background: none; border: none; color: var(--text3); font-size: 12px;
+      cursor: pointer; font-family: var(--font-body); padding: 0; margin-bottom: 10px;
+      text-decoration: underline; text-underline-offset: 3px;
+    }
+    .howto-toggle:hover { color: var(--text2); }
+    .howto {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px;
+      font-size: 13px; color: var(--text2); line-height: 1.7;
+    }
+    .howto b { color: var(--text); font-weight: 500; }
+    .howto ul { margin: 8px 0 0 16px; }
+    .howto li { margin-bottom: 4px; }
+    .howto .eg {
+      display: inline-block; background: var(--surface2);
+      border: 1px solid var(--border2); border-radius: 4px;
+      padding: 1px 6px; font-family: var(--font-cond); font-size: 13px;
+      color: var(--gold);
+    }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { display: inline-block; animation: spin .8s linear infinite; }
+
+    /* Responsive tweaks */
+    @media (max-width: 480px) {
+      .target-num { font-size: 30px; }
+      .target-tip { display: none; }
+      .score-num  { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="loading">
+    <div class="spin" style="font-size:28px;color:var(--gold)">⚾</div>
+    <div class="loading-label">Loading today's puzzle</div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────────────────────
+const STATS = [
+  { key: 'hr',        label: 'Home Runs',       file: 'data/hr.json' },
+  { key: 'rbi',       label: 'RBIs',             file: 'data/rbi.json' },
+  { key: 'hits',      label: 'Career Hits',      file: 'data/hits.json' },
+  { key: 'pitcher_k', label: 'Pitcher Ks',       file: 'data/pitcher_k.json' },
+  { key: 'pitcher_w', label: 'Pitcher Wins',     file: 'data/pitcher_w.json' },
+];
+
+// Magic number seeded range — works great once Lahman data gives ~1,000 players
+const MAGIC_MIN   = 300;   // e.g. target #1+#100+#200 area
+const MAGIC_MAX   = 900;   // requires knowing rank #300+ players
+const MAGIC_STEP  = 25;    // rounds to clean numbers
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RNG (mulberry32)
+// ─────────────────────────────────────────────────────────────────────────────
+function mulberry32(seed) {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function dailySeed() {
+  const d = new Date();
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA (populated by init())
+// ─────────────────────────────────────────────────────────────────────────────
+let MAGIC     = 0;
+let ALL_NAMES = [];    // sorted unique player names for autocomplete
+let IDX       = {};    // IDX[statKey]['barry bonds'] = {rank, name, value}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const S = {
+  // guesses[row][col] = {name, rank, value} or null
+  guesses: Array(5).fill(null).map(() => Array(3).fill(null)),
+  active:  null,   // [rowIdx, colIdx]
+  acQuery: '',
+  acResults: [],
+  acIdx: -1,
+  error: '',
+  howtoOpen: false,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCORING
+// ─────────────────────────────────────────────────────────────────────────────
+function rowSum(ri) {
+  return S.guesses[ri].reduce((a, g) => a + (g ? g.rank : 0), 0);
+}
+function rowFilled(ri) {
+  return S.guesses[ri].every(g => g !== null);
+}
+function rowPenalty(ri) {
+  if (!rowFilled(ri)) return null;
+  return Math.abs(rowSum(ri) - MAGIC);
+}
+function totalScore() {
+  let total = 0;
+  for (let i = 0; i < 5; i++) {
+    const p = rowPenalty(i);
+    if (p === null) return null;
+    total += p;
+  }
+  return total;
+}
+function penColor(pen) {
+  if (pen === null) return 'var(--text3)';
+  const pct = pen / MAGIC;
+  if (pct === 0)    return 'var(--green)';
+  if (pct <= 0.12)  return 'var(--green)';
+  if (pct <= 0.30)  return 'var(--yellow)';
+  if (pct <= 0.50)  return 'var(--orange)';
+  return 'var(--red)';
+}
+function penEmoji(pen) {
+  const pct = pen / MAGIC;
+  if (pct === 0)   return '🟩';
+  if (pct <= 0.12) return '🟩';
+  if (pct <= 0.30) return '🟨';
+  if (pct <= 0.50) return '🟧';
+  return '🟥';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTOCOMPLETE
+// ─────────────────────────────────────────────────────────────────────────────
+function filterPlayers(query, limit = 6) {
+  if (!query || query.length < 2) return [];
+  const q = query.toLowerCase();
+  return ALL_NAMES.filter(n => n.toLowerCase().includes(q)).slice(0, limit);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────────────────────────────────────
+function cellHTML(ri, ci) {
+  const g     = S.guesses[ri][ci];
+  const isAct = S.active && S.active[0] === ri && S.active[1] === ci;
+
+  if (isAct) {
+    const items = S.acResults
+      .map((n, i) => `<div class="ac-item${S.acIdx === i ? ' hi' : ''}" data-ac="${esc(n)}" data-ri="${ri}" data-ci="${ci}">${esc(n)}</div>`)
+      .join('');
+    const none = S.acQuery.length >= 2 && !S.acResults.length
+      ? `<div class="ac-none">No match — press Enter to search anyway</div>`
+      : '';
+    return `<div class="iw">
+      <input id="ai" type="text" value="${esc(S.acQuery)}"
+        placeholder="Search players…" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false"/>
+      ${items || none ? `<div class="ac-drop">${items || none}</div>` : ''}
+    </div>`;
+  }
+
+  if (g) {
+    return `<div class="chip" data-cr="${ri}" data-cc="${ci}">
+      <div class="chip-name">${esc(g.name)}</div>
+      <div class="chip-rank" style="color:var(--blue)">rank #${g.rank}</div>
+    </div>`;
+  }
+
+  return `<div class="slot" data-sr="${ri}" data-sc="${ci}">
+    <span class="slot-icon">+</span>
+  </div>`;
+}
+
+function sumCellHTML(ri) {
+  const filled = S.guesses[ri].filter(g => g).length;
+  if (filled === 0) {
+    return `<div class="sum-cell">
+      <span class="sum-num" style="color:var(--text3)">—</span>
+    </div>`;
+  }
+  const sum = rowSum(ri);
+  const pen = rowPenalty(ri);
+  const color = pen !== null ? penColor(pen) : 'var(--blue)';
+  return `<div class="sum-cell">
+    <div class="sum-num" style="color:${color}">${sum}</div>
+    <div class="sum-pen" style="color:${color}">
+      ${pen !== null ? `±${pen}` : `${3 - filled} left`}
+    </div>
+  </div>`;
+}
+
+function render() {
+  const dt    = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const score = totalScore();
+
+  const rows = STATS.map((stat, ri) => `
+    <div class="row">
+      <div class="row-label">${esc(stat.label)}</div>
+      ${[0, 1, 2].map(ci => `<div class="cell">${cellHTML(ri, ci)}</div>`).join('')}
+      ${sumCellHTML(ri)}
+    </div>`).join('');
+
+  const scoreBlock = score !== null ? `
+    <div class="score-footer">
+      <div>
+        <div class="score-label">FINAL SCORE</div>
+        <div class="score-num" style="color:${penColor(score)}">${score}</div>
+        <div class="score-sub">${score === 0 ? '🎯 perfect game!' : 'lower is better — 0 is perfect'}</div>
+      </div>
+      <button class="share-btn" id="share-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        Copy result
+      </button>
+    </div>` : `
+    <div class="score-footer incomplete">
+      <span class="score-tip">Fill all 15 picks to see your score — aim for 0</span>
+    </div>`;
+
+  const howtoContent = S.howtoOpen ? `
+    <div class="howto">
+      <b>How to play:</b>
+      <ul>
+        <li>Each row is an all-time MLB stat category.</li>
+        <li>Pick <b>3 players</b> whose all-time career ranks <b>sum as close to <span class="eg">${MAGIC}</span> as possible</b>.</li>
+        <li>Example: if you pick the <b>#1</b>, <b>#150</b>, and <b>#300</b> all-time HR leaders, your sum is 451.</li>
+        <li>Your score for each row is how far off you are from the target (<b>±difference</b>).</li>
+        <li>Your <b>final score</b> is the total of all 5 row penalties — <b>lower is better, 0 is perfect</b>.</li>
+        <li>Click a filled pick to clear it and try someone else.</li>
+        <li>Rankings refresh nightly from the Lahman baseball database.</li>
+      </ul>
+    </div>` : '';
+
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="logo">STAT<span>STACK</span></div>
+      <div class="header-right">
+        <span class="sport-badge">⚾ MLB</span>
+        <span class="date-label">${dt}</span>
+      </div>
+    </div>
+
+    <button class="howto-toggle" id="howto-btn">${S.howtoOpen ? 'Hide instructions' : 'How to play'}</button>
+    ${howtoContent}
+
+    <div class="target-strip">
+      <div class="target-left">
+        <span class="target-label">TARGET</span>
+        <span class="target-num">${MAGIC}</span>
+      </div>
+      <div class="target-tip">Pick 3 players per stat whose all-time ranks sum to this number</div>
+    </div>
+
+    ${S.error ? `<div class="info-bar err">${esc(S.error)}</div>` : ''}
+
+    <div class="board-wrap">
+      <div class="board">
+        <div class="col-hdr">
+          <span>Category</span>
+          <span>Pick 1</span>
+          <span>Pick 2</span>
+          <span>Pick 3</span>
+          <span>Sum</span>
+        </div>
+        ${rows}
+      </div>
+    </div>
+
+    ${scoreBlock}`;
+
+  bindPost();
+}
+
+function bindPost() {
+  // Re-attach input listeners (input element is recreated on each render)
+  const inp = document.getElementById('ai');
+  if (inp) {
+    inp.addEventListener('input', e => {
+      S.acQuery   = e.target.value;
+      S.acResults = filterPlayers(S.acQuery);
+      S.acIdx     = -1;
+      render();
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        S.acIdx = Math.min(S.acIdx + 1, S.acResults.length - 1);
+        render();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        S.acIdx = Math.max(S.acIdx - 1, -1);
+        render();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const name = S.acIdx >= 0
+          ? S.acResults[S.acIdx]
+          : S.acResults.length === 1
+            ? S.acResults[0]
+            : S.acQuery.trim() || null;
+        if (name) doSelect(S.active[0], S.active[1], name);
+      } else if (e.key === 'Escape') {
+        S.active = null; S.acQuery = ''; S.acResults = [];
+        render();
+      }
+    });
+    inp.focus();
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+  }
+
+  document.getElementById('share-btn')?.addEventListener('click', doShare);
+  document.getElementById('howto-btn')?.addEventListener('click', () => {
+    S.howtoOpen = !S.howtoOpen;
+    render();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT DELEGATION (attached once)
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('app').addEventListener('click', e => {
+  // Autocomplete item click
+  const ac = e.target.closest('[data-ac]');
+  if (ac) { doSelect(+ac.dataset.ri, +ac.dataset.ci, ac.dataset.ac); return; }
+
+  // Empty slot click
+  const sl = e.target.closest('.slot');
+  if (sl && sl.dataset.sr !== undefined) {
+    S.active    = [+sl.dataset.sr, +sl.dataset.sc];
+    S.acQuery   = '';
+    S.acResults = [];
+    S.acIdx     = -1;
+    S.error     = '';
+    render(); return;
+  }
+
+  // Chip click (clear + re-edit)
+  const cp = e.target.closest('.chip');
+  if (cp && cp.dataset.cr !== undefined) {
+    const ri = +cp.dataset.cr, ci = +cp.dataset.cc;
+    const old = S.guesses[ri][ci];
+    S.guesses[ri][ci] = null;
+    S.active    = [ri, ci];
+    S.acQuery   = old ? old.name : '';
+    S.acResults = old ? filterPlayers(old.name) : [];
+    S.acIdx     = -1;
+    S.error     = '';
+    render(); return;
+  }
+
+  // Click outside input — close dropdown
+  if (!e.target.closest('.iw') && !e.target.closest('.ac-drop')) {
+    if (S.active) { S.active = null; S.acQuery = ''; S.acResults = []; render(); }
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELECT PLAYER (instant lookup — no API)
+// ─────────────────────────────────────────────────────────────────────────────
+function doSelect(ri, ci, name) {
+  if (!name) return;
+  name = name.trim();
+
+  // Duplicate check within the same row
+  if (S.guesses[ri].some((g, j) => g && g.name.toLowerCase() === name.toLowerCase() && j !== ci)) {
+    S.error = `${name} is already used in this row — pick someone else`;
+    render(); return;
+  }
+
+  // Rank lookup (instant — no network call)
+  const statKey = STATS[ri].key;
+  const key     = name.toLowerCase();
+  const result  = IDX[statKey][key] || null;
+
+  if (!result) {
+    S.error = `"${name}" is not in the top ${Object.keys(IDX[statKey]).length} for ${STATS[ri].label} — try another player`;
+    S.active    = [ri, ci];
+    S.acQuery   = name;
+    S.acResults = filterPlayers(name);
+    render(); return;
+  }
+
+  // Commit the pick
+  S.guesses[ri][ci] = { name: result.name, rank: result.rank, value: result.value };
+  S.error = '';
+
+  // Auto-advance: next empty cell in this row, then first empty in next rows
+  const nextCol = S.guesses[ri].findIndex(g => !g);
+  if (nextCol !== -1) {
+    S.active = [ri, nextCol];
+  } else {
+    S.active = null;
+    for (let r = ri + 1; r < 5; r++) {
+      const c = S.guesses[r].findIndex(g => !g);
+      if (c !== -1) { S.active = [r, c]; break; }
+    }
+  }
+
+  S.acQuery   = '';
+  S.acResults = [];
+  render();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARE
+// ─────────────────────────────────────────────────────────────────────────────
+function doShare() {
+  const dt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const rows = STATS.map((stat, ri) => {
+    const p = rowPenalty(ri);
+    return `${stat.label}: ${p !== null ? penEmoji(p) : '⬜'} ±${p ?? '?'}`;
+  }).join('\n');
+  const score = totalScore();
+  const text = `STATSTACK — ${dt}\n⚾ MLB · Target: ${MAGIC}\nScore: ${score ?? 'incomplete'}\n\n${rows}\nstatstack.game`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('share-btn');
+    if (btn) {
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+      setTimeout(() => render(), 2200);
+    }
+  }).catch(() => {
+    alert(text);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT — load all 5 JSON files in parallel, then start the game
+// ─────────────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const results = await Promise.all(
+      STATS.map(s => fetch(s.file).then(r => {
+        if (!r.ok) throw new Error(`${s.file} returned ${r.status}`);
+        return r.json();
+      }))
+    );
+
+    // Build rank index + autocomplete pool
+    const nameSet = new Set();
+    STATS.forEach((stat, i) => {
+      IDX[stat.key] = {};
+      for (const player of results[i]) {
+        IDX[stat.key][player.name.toLowerCase()] = player;
+        nameSet.add(player.name);
+      }
+    });
+    ALL_NAMES = [...nameSet].sort((a, b) => a.localeCompare(b));
+
+    // Seed today's magic number (same for every player on a given date)
+    const rnd  = mulberry32(dailySeed());
+    const steps = Math.floor((MAGIC_MAX - MAGIC_MIN) / MAGIC_STEP);
+    MAGIC = MAGIC_MIN + Math.round(rnd() * steps) * MAGIC_STEP;
+
+    render();
+
+  } catch (err) {
+    document.getElementById('app').innerHTML = `
+      <div id="error-screen">
+        <div style="font-size:32px">⚠️</div>
+        <div class="error-msg">
+          <strong>Could not load game data.</strong><br><br>
+          Make sure the <code>data/</code> folder contains the five JSON files.<br>
+          Run <code>python build_data.py</code> to generate them.
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-top:8px">${err.message}</div>
+      </div>`;
+  }
+}
+
+// Kick off
+init();
+</script>
+</body>
+</html>

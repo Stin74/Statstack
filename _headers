@@ -1,0 +1,11 @@
+# Cache JSON data files for 24 hours — they only update once per day
+/data/*.json
+  Cache-Control: public, max-age=86400, stale-while-revalidate=3600
+
+# Cache the game itself for 1 hour
+/index.html
+  Cache-Control: public, max-age=3600
+
+# Everything else — short cache
+/*
+  Cache-Control: public, max-age=3600
