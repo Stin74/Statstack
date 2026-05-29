@@ -745,14 +745,19 @@ async function submitScore(score) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 function doShare() {
-  const dt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const dt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const sportLabel = SPORTS[S.sport].label;
+  const score = totalScore();
+
+  // Pad labels so scores line up neatly
+  const maxLen = Math.max(...TODAY_CATS.map(s => s.label.length));
   const rows = TODAY_CATS.map((stat, ri) => {
     const p = rowPenalty(ri);
-    return `${stat.label}: ${p !== null ? penEmoji(p) : '⬜'} ±${p ?? '?'}`;
+    const padded = stat.label.padEnd(maxLen, ' ');
+    return `${padded}  ${p !== null ? penEmoji(p) : '⬜'} ±${p ?? '?'}`;
   }).join('\n');
-  const score = totalScore();
-  const sportLabel = SPORTS[S.sport].label;
-  const text = `STATSTACK — ${dt}\n${sportLabel} · Target: ${MAGIC}\nScore: ${score ?? 'incomplete'}\n\n${rows}\nstatstack.game`;
+
+  const text = `StatStack ${sportLabel}\n${dt}\n\n${rows}\n\nstatstack.game`;
 
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('share-btn');
