@@ -235,6 +235,23 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { display: inline-block; animation: spin .8s linear infinite; }
 
+    /* ── Sport toggle ───────────────────────────── */
+    .sport-toggle {
+      display: flex; gap: 4px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 99px; padding: 3px;
+    }
+    .sport-btn {
+      font-family: var(--font-cond); font-size: 12px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      padding: 4px 12px; border-radius: 99px; border: none;
+      cursor: pointer; transition: background .15s, color .15s;
+      background: transparent; color: var(--text2);
+    }
+    .sport-btn.active {
+      background: var(--surface2); color: var(--text);
+    }
+
     /* Desktop: a little more breathing room */
     @media (min-width: 540px) {
       #app { padding: 20px 20px 30px; }
@@ -256,19 +273,40 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
-const STATS = [
-  { key: 'hr',        label: 'Home Runs',       file: 'data/hr.json' },
-  { key: 'rbi',       label: 'RBIs',             file: 'data/rbi.json' },
-  { key: 'hits',      label: 'Career Hits',      file: 'data/hits.json' },
-  { key: 'pitcher_k', label: 'Pitcher Ks',       file: 'data/pitcher_k.json' },
-  { key: 'pitcher_w', label: 'Pitcher Wins',     file: 'data/pitcher_w.json' },
-];
+const SPORTS = {
+  mlb: {
+    label: '⚾ MLB',
+    emoji: '⚾',
+    stats: [
+      { key: 'hr',        label: 'Home Runs',     file: 'data/hr.json' },
+      { key: 'rbi',       label: 'RBIs',           file: 'data/rbi.json' },
+      { key: 'hits',      label: 'Career Hits',    file: 'data/hits.json' },
+      { key: 'pitcher_k', label: 'Pitcher Ks',     file: 'data/pitcher_k.json' },
+      { key: 'pitcher_w', label: 'Pitcher Wins',   file: 'data/pitcher_w.json' },
+    ],
+  },
+  nfl: {
+    label: '🏈 NFL',
+    emoji: '🏈',
+    stats: [
+      { key: 'nfl_pass_yds', label: 'Pass Yards',   file: 'data/nfl_pass_yds.json' },
+      { key: 'nfl_pass_td',  label: 'Pass TDs',     file: 'data/nfl_pass_td.json' },
+      { key: 'nfl_pass_int', label: 'INTs Thrown',  file: 'data/nfl_pass_int.json' },
+      { key: 'nfl_rush_yds', label: 'Rush Yards',   file: 'data/nfl_rush_yds.json' },
+      { key: 'nfl_rush_td',  label: 'Rush TDs',     file: 'data/nfl_rush_td.json' },
+      { key: 'nfl_rec_yds',  label: 'Rec Yards',    file: 'data/nfl_rec_yds.json' },
+      { key: 'nfl_rec_td',   label: 'Rec TDs',      file: 'data/nfl_rec_td.json' },
+      { key: 'nfl_sacks',    label: 'Sacks',        file: 'data/nfl_sacks.json' },
+      { key: 'nfl_def_int',  label: 'Def INTs',     file: 'data/nfl_def_int.json' },
+    ],
+  },
+};
 
 // Magic number seeded range — 1,500 players per category
-const MAGIC_MIN   = 300;   // e.g. target #1+#100+#200 area
-const MAGIC_MAX   = 1200;  // requires knowing rank #400+ players
-const MAGIC_STEP  = 25;    // rounds to clean numbers
-const DAILY_CATS  = 3;     // how many categories to show each day
+const MAGIC_MIN   = 300;
+const MAGIC_MAX   = 1200;
+const MAGIC_STEP  = 25;
+const DAILY_CATS  = 3;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RNG (mulberry32)
@@ -289,20 +327,21 @@ function dailySeed() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DATA (populated by init())
+// DATA (populated by init() / switchSport())
 // ─────────────────────────────────────────────────────────────────────────────
 let MAGIC      = 0;
 let ALL_NAMES  = [];    // sorted unique player names for autocomplete
-let IDX        = {};    // IDX[statKey]['barry bonds'] = {rank, name, value}
+let IDX        = {};    // IDX[statKey][name] = {rank, name, value}
 let TODAY_CATS = [];    // 3 stat objects picked by daily seed
+let LOADED     = {};    // cache of already-fetched sport data keyed by sport id
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GAME STATE
 // ─────────────────────────────────────────────────────────────────────────────
 const S = {
-  // guesses[row][col] = {name, rank, value} or null
+  sport:    'mlb',  // active sport
   guesses: Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null)),
-  active:  null,   // [rowIdx, colIdx]
+  active:  null,
   acQuery: '',
   acResults: [],
   acIdx: -1,
@@ -325,7 +364,7 @@ function rowPenalty(ri) {
 }
 function totalScore() {
   let total = 0;
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < DAILY_CATS; i++) {
     const p = rowPenalty(i);
     if (p === null) return null;
     total += p;
@@ -450,25 +489,30 @@ function render() {
       <span class="score-tip">Fill all 15 picks to see your score — aim for 0</span>
     </div>`;
 
+  const sportName = SPORTS[S.sport].label;
   const howtoContent = S.howtoOpen ? `
     <div class="howto">
       <b>How to play:</b>
       <ul>
-        <li>Each row is an all-time MLB stat category.</li>
+        <li>Each row is an all-time ${sportName} stat category.</li>
         <li>Pick <b>3 players</b> whose all-time career ranks <b>sum as close to <span class="eg">${MAGIC}</span> as possible</b>.</li>
-        <li>Example: if you pick the <b>#1</b>, <b>#150</b>, and <b>#300</b> all-time HR leaders, your sum is 451.</li>
+        <li>Example: if you pick the <b>#1</b>, <b>#150</b>, and <b>#300</b> all-time leaders, your sum is 451.</li>
         <li>Your score for each row is how far off you are from the target (<b>±difference</b>).</li>
-        <li>Your <b>final score</b> is the total of all 5 row penalties — <b>lower is better, 0 is perfect</b>.</li>
+        <li>Your <b>final score</b> is the total of all row penalties — <b>lower is better, 0 is perfect</b>.</li>
         <li>Click a filled pick to clear it and try someone else.</li>
-        <li>Rankings refresh nightly from the Lahman baseball database.</li>
+        <li>Rankings refresh nightly. NFL stats cover the 1999–present era.</li>
       </ul>
     </div>` : '';
+
+  const toggleBtns = Object.entries(SPORTS).map(([id, sp]) =>
+    `<button class="sport-btn${S.sport === id ? ' active' : ''}" data-sport="${id}">${sp.label}</button>`
+  ).join('');
 
   document.getElementById('app').innerHTML = `
     <div class="header">
       <div class="logo">STAT<span>STACK</span></div>
       <div class="header-right">
-        <span class="sport-badge">⚾ MLB</span>
+        <div class="sport-toggle">${toggleBtns}</div>
         <span class="date-label">${dt}</span>
       </div>
     </div>
@@ -622,7 +666,7 @@ function doSelect(ri, ci, name) {
     S.active = [ri, nextCol];
   } else {
     S.active = null;
-    for (let r = ri + 1; r < 5; r++) {
+    for (let r = ri + 1; r < DAILY_CATS; r++) {
       const c = S.guesses[r].findIndex(g => !g);
       if (c !== -1) { S.active = [r, c]; break; }
     }
@@ -643,7 +687,8 @@ function doShare() {
     return `${stat.label}: ${p !== null ? penEmoji(p) : '⬜'} ±${p ?? '?'}`;
   }).join('\n');
   const score = totalScore();
-  const text = `STATSTACK — ${dt}\n⚾ MLB · Target: ${MAGIC}\nScore: ${score ?? 'incomplete'}\n\n${rows}\nstatstack.game`;
+  const sportLabel = SPORTS[S.sport].label;
+  const text = `STATSTACK — ${dt}\n${sportLabel} · Target: ${MAGIC}\nScore: ${score ?? 'incomplete'}\n\n${rows}\nstatstack.game`;
 
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('share-btn');
@@ -657,57 +702,86 @@ function doShare() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INIT — load all 5 JSON files in parallel, then start the game
+// SPORT SWITCH
 // ─────────────────────────────────────────────────────────────────────────────
-async function init() {
-  try {
-    const results = await Promise.all(
-      STATS.map(s => fetch(s.file).then(r => {
-        if (!r.ok) throw new Error(`${s.file} returned ${r.status}`);
-        return r.json();
-      }))
-    );
-
-    // Build rank index + autocomplete pool
-    const nameSet = new Set();
-    STATS.forEach((stat, i) => {
-      IDX[stat.key] = {};
-      for (const player of results[i]) {
-        IDX[stat.key][player.name.toLowerCase()] = player;
-        nameSet.add(player.name);
-      }
-    });
-    ALL_NAMES = [...nameSet].sort((a, b) => a.localeCompare(b));
-
-    // Seed today's categories + magic number (same for every player on a given date)
-    const rnd  = mulberry32(dailySeed());
-
-    // Pick DAILY_CATS categories by shuffling with the seeded RNG
-    const pool = [...STATS];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(rnd() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    TODAY_CATS = pool.slice(0, DAILY_CATS);
-
-    const steps = Math.floor((MAGIC_MAX - MAGIC_MIN) / MAGIC_STEP);
-    MAGIC = MAGIC_MIN + Math.round(rnd() * steps) * MAGIC_STEP;
-
-    render();
-
-  } catch (err) {
-    document.getElementById('app').innerHTML = `
-      <div id="error-screen">
-        <div style="font-size:32px">⚠️</div>
-        <div class="error-msg">
-          <strong>Could not load game data.</strong><br><br>
-          Make sure the <code>data/</code> folder contains the JSON files.<br>
-          Run <code>python build_data.py</code> to generate them.
-        </div>
-        <div style="font-size:12px;color:var(--text3);margin-top:8px">${err.message}</div>
-      </div>`;
-  }
+async function switchSport(sportId) {
+  if (sportId === S.sport) return;
+  S.sport   = sportId;
+  S.guesses = Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null));
+  S.active  = null; S.acQuery = ''; S.acResults = []; S.error = '';
+  await loadSport(sportId);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT — load JSON files for the active sport, then start the game
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadSport(sportId) {
+  const sport = SPORTS[sportId];
+
+  // Use cached data if already loaded
+  if (!LOADED[sportId]) {
+    try {
+      const results = await Promise.all(
+        sport.stats.map(s => fetch(s.file).then(r => {
+          if (!r.ok) throw new Error(`${s.file} returned ${r.status}`);
+          return r.json();
+        }))
+      );
+      const idx = {};
+      const nameSet = new Set();
+      sport.stats.forEach((stat, i) => {
+        idx[stat.key] = {};
+        for (const player of results[i]) {
+          idx[stat.key][player.name.toLowerCase()] = player;
+          nameSet.add(player.name);
+        }
+      });
+      LOADED[sportId] = { idx, names: [...nameSet].sort((a, b) => a.localeCompare(b)) };
+    } catch (err) {
+      document.getElementById('app').innerHTML = `
+        <div id="error-screen">
+          <div style="font-size:32px">⚠️</div>
+          <div class="error-msg">
+            <strong>Could not load game data.</strong><br><br>
+            Make sure the <code>data/</code> folder contains the JSON files.<br>
+            Run <code>python build_data.py</code> and <code>python build_nfl_data.py</code> to generate them.
+          </div>
+          <div style="font-size:12px;color:var(--text3);margin-top:8px">${err.message}</div>
+        </div>`;
+      return;
+    }
+  }
+
+  IDX       = LOADED[sportId].idx;
+  ALL_NAMES = LOADED[sportId].names;
+
+  // Each sport gets its own seeded seed offset so the category picks differ
+  const sportOffset = sportId === 'mlb' ? 0 : 99991;
+  const rnd = mulberry32(dailySeed() + sportOffset);
+
+  const pool = [...sport.stats];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  TODAY_CATS = pool.slice(0, DAILY_CATS);
+
+  const steps = Math.floor((MAGIC_MAX - MAGIC_MIN) / MAGIC_STEP);
+  MAGIC = MAGIC_MIN + Math.round(rnd() * steps) * MAGIC_STEP;
+
+  render();
+}
+
+async function init() {
+  await loadSport(S.sport);
+}
+
+// sport toggle button clicks are handled in bindPost — but we need it on the
+// delegated listener since the header re-renders each time
+document.getElementById('app').addEventListener('click', e => {
+  const sb = e.target.closest('.sport-btn');
+  if (sb && sb.dataset.sport) { switchSport(sb.dataset.sport); return; }
+}, true);  // capture phase so it fires before other handlers
 
 // Kick off
 init();

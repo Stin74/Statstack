@@ -1,8 +1,8 @@
-name: Refresh MLB Rankings
+name: Refresh Rankings
 
 on:
   schedule:
-    - cron: "0 7 * * *"   # 7 AM UTC daily (after overnight games settle)
+    - cron: "0 7 * * *"   # 7 AM UTC daily
   workflow_dispatch:        # allow manual trigger from GitHub UI
 
 jobs:
@@ -23,8 +23,11 @@ jobs:
       - name: Install dependencies
         run: pip install pandas requests
 
-      - name: Run data builder
+      - name: Run MLB data builder
         run: python build_data.py
+
+      - name: Run NFL data builder
+        run: python build_nfl_data.py
 
       - name: Commit updated JSONs
         run: |
@@ -32,5 +35,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/*.json
           git diff --staged --quiet \
-            || git commit -m "chore: refresh MLB rankings $(date -u +%Y-%m-%d)"
+            || git commit -m "chore: refresh rankings $(date -u +%Y-%m-%d)"
           git push
