@@ -757,7 +757,8 @@ function doShare() {
     return `${padded}  ${p !== null ? penEmoji(p) : '⬜'} ±${p ?? '?'}`;
   }).join('\n');
 
-  const text = `StatStack ${sportLabel}\n${dt}\n\n${rows}\n\nstatstack.game`;
+  const diffTag = S.difficulty === 'hard' ? ' (Hard)' : '';
+  const text = `StatStack ${sportLabel}${diffTag}\n${dt}\n\n${rows}\n\nstatstack.game`;
 
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('share-btn');
