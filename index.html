@@ -685,7 +685,7 @@ function doSelect(ri, ci, name) {
   const result  = IDX[statKey][key] || null;
 
   if (!result) {
-    S.error = `"${name}" not found for ${TODAY_CATS[ri].label} — try another player`;
+    S.error = `"${name}" is not in our top 2,000 for ${TODAY_CATS[ri].label}`;
     S.active    = [ri, ci];
     S.acQuery   = name;
     S.acResults = filterPlayers(name, statKey);
