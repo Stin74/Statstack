@@ -1,93 +1,191 @@
 #!/usr/bin/env python3
 """
 StatStack — NFL data builder
-Pulls pre-aggregated season stats from nflverse-data (GitHub releases) and
-produces eight ranked JSON files — one per stat category — each with the
-top 1,000 all-time career leaders (1999–present).
+Pulls all-time career leaders from the ESPN Core API (full history, not
+just 1999+) and produces ranked JSON files for the top 1,000 players.
+
+Categories (all all-time, no era cutoff):
+    nfl_pass_yds.json   Career Passing Yards
+    nfl_pass_td.json    Career Passing TDs
+    nfl_rush_yds.json   Career Rushing Yards
+    nfl_rush_td.json    Career Rushing TDs
+    nfl_receptions.json Career Receptions
+    nfl_rec_yds.json    Career Receiving Yards
+    nfl_rec_td.json     Career Receiving TDs
+    nfl_sacks.json      Career Sacks
+    nfl_def_int.json    Career Defensive INTs
 
 Usage:
     pip install pandas requests
     python build_nfl_data.py
-
-Outputs (written to ./data/):
-    nfl_pass_yds.json     Career Passing Yards   (QBs)
-    nfl_pass_td.json      Career Passing TDs     (QBs)
-    nfl_pass_int.json     Career Interceptions Thrown (QBs — lower is notable)
-    nfl_rush_yds.json     Career Rushing Yards
-    nfl_rush_td.json      Career Rushing TDs
-    nfl_rec_yds.json      Career Receiving Yards
-    nfl_rec_td.json       Career Receiving TDs
-    nfl_sacks.json        Career Sacks           (defense)
-    nfl_def_int.json      Career Defensive INTs  (defense)
-
-Run nightly alongside build_data.py to keep rankings current.
 """
 
 import os
 import json
 import sys
-import pandas as pd
+import re
+import time
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-BASE = "https://github.com/nflverse/nflverse-data/releases/download/player_stats/"
-OUT_DIR = "data"
-TOP_N = 1000
-YEARS = range(1999, 2025)
+OUT_DIR  = "data"
+TOP_N    = 1000
+ESPN_BASE = "http://sports.core.api.espn.com/v2/sports/football/leagues/nfl"
+
+SESSION = requests.Session()
+SESSION.headers.update({"User-Agent": "StatStack-DataBuilder/1.0"})
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# ESPN helpers
 # ---------------------------------------------------------------------------
 
-def load_season_csvs(pattern: str) -> pd.DataFrame:
-    """Download and concatenate per-season CSVs matching the URL pattern."""
-    frames = []
-    for year in YEARS:
-        url = BASE + pattern.format(year=year)
+def espn_get(url: str, params: dict | None = None, retries: int = 3) -> dict:
+    for attempt in range(retries):
         try:
-            df = pd.read_csv(url, low_memory=False)
-            # Keep only regular season
-            if "season_type" in df.columns:
-                df = df[df["season_type"] == "REG"]
-            frames.append(df)
-            print(".", end="", flush=True)
-        except Exception:
-            pass  # year not available — skip silently
-    print()
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+            r = SESSION.get(url, params=params, timeout=15)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            if attempt == retries - 1:
+                raise
+            time.sleep(1.5 ** attempt)
+    return {}
 
 
-def career_leaders(
-    df: pd.DataFrame,
-    stat_col: str,
-    name_col: str = "player_display_name",
-    top_n: int = TOP_N,
-    min_value: int = 1,
-    position_filter: list[str] | None = None,
-) -> list[dict]:
-    """Aggregate career totals, sort descending, return top_n dicts."""
-    if stat_col not in df.columns:
-        raise KeyError(f"Column '{stat_col}' not found")
+def athlete_id_from_ref(ref: str) -> str:
+    """Extract numeric ID from a $ref URL like .../athletes/12?..."""
+    m = re.search(r'/athletes/(\d+)', ref)
+    return m.group(1) if m else ""
 
-    sub = df.copy()
-    if position_filter:
-        sub = sub[sub["position_group"].isin(position_filter)]
 
-    totals = (
-        sub.groupby("player_display_name")[stat_col]
-        .sum()
-        .reset_index()
-        .rename(columns={stat_col: "value", "player_display_name": "name"})
+def fetch_athlete_name(athlete_id: str) -> tuple[str, str]:
+    """Return (athlete_id, display_name). Returns empty string on failure."""
+    try:
+        data = espn_get(f"{ESPN_BASE}/athletes/{athlete_id}")
+        return athlete_id, data.get("displayName", "")
+    except Exception:
+        return athlete_id, ""
+
+
+def resolve_names(athlete_ids: list[str], workers: int = 30) -> dict[str, str]:
+    """Batch-resolve athlete IDs → display names using a thread pool."""
+    names: dict[str, str] = {}
+    total = len(athlete_ids)
+    print(f"  Resolving {total:,} athlete names ", end="", flush=True)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(fetch_athlete_name, aid): aid for aid in athlete_ids}
+        done = 0
+        for fut in as_completed(futures):
+            aid, name = fut.result()
+            if name:
+                names[aid] = name
+            done += 1
+            if done % 100 == 0:
+                print(".", end="", flush=True)
+    print(f" done ({len(names):,} resolved)")
+    return names
+
+
+# ---------------------------------------------------------------------------
+# Fetch all-time leaders from ESPN
+# ---------------------------------------------------------------------------
+
+def fetch_espn_leaders(category_name: str, limit: int = TOP_N) -> list[dict]:
+    """
+    Pull career leaders for a named category from ESPN's all-time leaders
+    endpoint. Returns list of {athlete_id, value} dicts.
+    """
+    data = espn_get(
+        f"{ESPN_BASE}/leaders/0",
+        params={"lang": "en", "region": "us", "limit": limit},
     )
-    totals = totals[totals["value"] >= min_value]
-    totals = (
-        totals.sort_values("value", ascending=False)
-        .head(top_n)
-        .reset_index(drop=True)
-    )
-    totals["rank"] = totals.index + 1
-    totals["value"] = totals["value"].round().astype(int)
-    return totals[["rank", "name", "value"]].to_dict("records")
+    cats = data.get("categories", [])
+    cat = next((c for c in cats if c["name"] == category_name), None)
+    if cat is None:
+        raise KeyError(f"Category '{category_name}' not found in ESPN leaders")
+    leaders = []
+    for entry in cat.get("leaders", []):
+        ref = entry.get("athlete", {}).get("$ref", "")
+        aid = athlete_id_from_ref(ref)
+        val = entry.get("value", 0)
+        if aid and val > 0:
+            leaders.append({"athlete_id": aid, "value": val})
+    return leaders
 
+
+# ---------------------------------------------------------------------------
+# Receiving yards/TDs — fetch from per-athlete career stats
+# (not in ESPN's leaders endpoint, so we derive from the receptions leaders)
+# ---------------------------------------------------------------------------
+
+def fetch_receiving_stats(athlete_id: str) -> dict:
+    """Return receiving yards and TDs for one athlete."""
+    try:
+        data = espn_get(f"{ESPN_BASE}/athletes/{athlete_id}/statistics/0")
+        cats = data.get("splits", {}).get("categories", [])
+        rec_cat = next((c for c in cats if c["name"] == "receiving"), None)
+        if not rec_cat:
+            return {"yards": 0, "tds": 0}
+        stats = {s["name"]: s.get("value", 0) for s in rec_cat.get("stats", [])}
+        return {
+            "yards": int(stats.get("receivingYards", 0)),
+            "tds":   int(stats.get("receivingTouchdowns", 0)),
+        }
+    except Exception:
+        return {"yards": 0, "tds": 0}
+
+
+def build_receiving_leaders(receptions_leaders: list[dict], names: dict[str, str]) -> tuple[list[dict], list[dict]]:
+    """
+    For the top receptions leaders (which captures all high receiving-yards
+    players), fetch per-athlete career receiving yards + TDs concurrently.
+    """
+    ids = [l["athlete_id"] for l in receptions_leaders]
+    rec_stats: dict[str, dict] = {}
+    print(f"  Fetching receiving stats for {len(ids):,} athletes ", end="", flush=True)
+    with ThreadPoolExecutor(max_workers=25) as pool:
+        futures = {pool.submit(fetch_receiving_stats, aid): aid for aid in ids}
+        done = 0
+        for fut in as_completed(futures):
+            aid = futures[fut]
+            rec_stats[aid] = fut.result()
+            done += 1
+            if done % 100 == 0:
+                print(".", end="", flush=True)
+    print(" done")
+
+    # Build receiving yards leaders
+    yds_rows = []
+    for l in receptions_leaders:
+        aid  = l["athlete_id"]
+        name = names.get(aid, "")
+        yds  = rec_stats.get(aid, {}).get("yards", 0)
+        if name and yds > 0:
+            yds_rows.append({"name": name, "value": yds})
+
+    # Build receiving TD leaders
+    td_rows = []
+    for l in receptions_leaders:
+        aid  = l["athlete_id"]
+        name = names.get(aid, "")
+        tds  = rec_stats.get(aid, {}).get("tds", 0)
+        if name and tds > 0:
+            td_rows.append({"name": name, "value": tds})
+
+    return rank_rows(yds_rows), rank_rows(td_rows)
+
+
+def rank_rows(rows: list[dict], top_n: int = TOP_N) -> list[dict]:
+    rows = sorted(rows, key=lambda r: r["value"], reverse=True)[:top_n]
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Save
+# ---------------------------------------------------------------------------
 
 def save_json(records: list[dict], filepath: str) -> None:
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -97,44 +195,65 @@ def save_json(records: list[dict], filepath: str) -> None:
     print(f"  → {filepath}  ({len(records)} players  |  #1: {top['name']} {top['value']:,})")
 
 
+def leaders_to_records(leaders: list[dict], names: dict[str, str]) -> list[dict]:
+    rows = []
+    for l in leaders:
+        name = names.get(l["athlete_id"], "")
+        if name:
+            rows.append({"name": name, "value": int(l["value"])})
+    return rank_rows(rows)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    print("Downloading NFL offensive season stats (1999–2024)...")
-    offense = load_season_csvs("player_stats_season_{year}.csv")
-    print(f"  {len(offense):,} player-seasons loaded")
+    print("Fetching ESPN all-time NFL career leaders...")
 
-    print("Downloading NFL defensive season stats (1999–2024)...")
-    defense = load_season_csvs("player_stats_def_season_{year}.csv")
-    print(f"  {len(defense):,} player-seasons loaded")
+    # ── Step 1: fetch all leader lists ──────────────────────────────────────
+    categories = {
+        "passingYards":      "nfl_pass_yds.json",
+        "passingTouchdowns": "nfl_pass_td.json",
+        "rushingYards":      "nfl_rush_yds.json",
+        "rushingTouchdowns": "nfl_rush_td.json",
+        "receptions":        "nfl_receptions.json",
+        "sacks":             "nfl_sacks.json",
+        "interceptions":     "nfl_def_int.json",
+    }
 
-    print("\nBuilding passing leaders...")
-    save_json(career_leaders(offense, "passing_yards",  position_filter=["QB"]),
-              f"{OUT_DIR}/nfl_pass_yds.json")
-    save_json(career_leaders(offense, "passing_tds",    position_filter=["QB"]),
-              f"{OUT_DIR}/nfl_pass_td.json")
-    save_json(career_leaders(offense, "interceptions",  position_filter=["QB"], min_value=1),
-              f"{OUT_DIR}/nfl_pass_int.json")
+    leader_data: dict[str, list[dict]] = {}
+    for cat_name in categories:
+        print(f"  {cat_name} ...", end=" ", flush=True)
+        leader_data[cat_name] = fetch_espn_leaders(cat_name)
+        print(f"{len(leader_data[cat_name])} leaders")
 
-    print("\nBuilding rushing leaders...")
-    save_json(career_leaders(offense, "rushing_yards",  min_value=100),
-              f"{OUT_DIR}/nfl_rush_yds.json")
-    save_json(career_leaders(offense, "rushing_tds"),
-              f"{OUT_DIR}/nfl_rush_td.json")
+    # Also fetch receptions leaders at full limit for receiving yards/TDs
+    print("  receptions (for rec yards/TDs) ...", end=" ", flush=True)
+    rec_leaders = fetch_espn_leaders("receptions", limit=TOP_N)
+    print(f"{len(rec_leaders)} leaders")
 
-    print("\nBuilding receiving leaders...")
-    save_json(career_leaders(offense, "receiving_yards", min_value=100),
-              f"{OUT_DIR}/nfl_rec_yds.json")
-    save_json(career_leaders(offense, "receiving_tds"),
-              f"{OUT_DIR}/nfl_rec_td.json")
+    # ── Step 2: resolve all unique athlete names ─────────────────────────────
+    all_ids = set()
+    for leaders in leader_data.values():
+        for l in leaders:
+            all_ids.add(l["athlete_id"])
+    for l in rec_leaders:
+        all_ids.add(l["athlete_id"])
 
-    print("\nBuilding defensive leaders...")
-    save_json(career_leaders(defense, "def_sacks",         min_value=1),
-              f"{OUT_DIR}/nfl_sacks.json")
-    save_json(career_leaders(defense, "def_interceptions", min_value=1),
-              f"{OUT_DIR}/nfl_def_int.json")
+    names = resolve_names(list(all_ids))
+
+    # ── Step 3: build and save the 7 standard leader JSONs ──────────────────
+    print("\nBuilding and saving leader files...")
+    for cat_name, filename in categories.items():
+        records = leaders_to_records(leader_data[cat_name], names)
+        save_json(records, f"{OUT_DIR}/{filename}")
+
+    # ── Step 4: build receiving yards + TDs from per-athlete stats ───────────
+    print("\nBuilding receiving yards and TDs (fetching per-athlete stats)...")
+    rec_yds_records, rec_td_records = build_receiving_leaders(rec_leaders, names)
+    save_json(rec_yds_records, f"{OUT_DIR}/nfl_rec_yds.json")
+    save_json(rec_td_records,  f"{OUT_DIR}/nfl_rec_td.json")
 
     print(f"\nDone. Nine NFL JSON files written to ./{OUT_DIR}/")
 
