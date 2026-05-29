@@ -402,14 +402,8 @@ function penEmoji(pen) {
 // ─────────────────────────────────────────────────────────────────────────────
 function filterPlayers(query, statKey, limit = 6) {
   if (!query || query.length < 2) return [];
-  const q    = query.toLowerCase();
-  const diff = DIFFICULTIES[S.difficulty];
-  return ALL_NAMES.filter(n => {
-    if (!n.toLowerCase().includes(q)) return false;
-    const entry = IDX[statKey]?.[n.toLowerCase()];
-    if (!entry) return false;
-    return entry.rank >= diff.rankMin && entry.rank <= diff.rankMax;
-  }).slice(0, limit);
+  const q = query.toLowerCase();
+  return ALL_NAMES.filter(n => n.toLowerCase().includes(q)).slice(0, limit);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -517,8 +511,8 @@ function render() {
       <b>How to play:</b>
       <ul>
         <li>Each row is an all-time ${sportName} stat category.</li>
-        <li>Pick <b>3 players</b> (ranks #${diff.rankMin}–${diff.rankMax}) whose career ranks <b>sum as close to <span class="eg">${MAGIC}</span> as possible</b>.</li>
-        <li>Example: in Normal mode, if you pick ranks <b>#20</b>, <b>#60</b>, and <b>#100</b>, your sum is 180.</li>
+        <li>Pick <b>3 players</b> whose all-time career ranks <b>sum as close to <span class="eg">${MAGIC}</span> as possible</b>.</li>
+        <li>Example: if you pick the <b>#1</b>, <b>#20</b>, and <b>#50</b> all-time leaders, your sum is 71.</li>
         <li>Your score for each row is how far off you are from the target (<b>±difference</b>).</li>
         <li>Your <b>final score</b> is the total of all row penalties — <b>lower is better, 0 is perfect</b>.</li>
         <li>Click a filled pick to clear it and try someone else.</li>
@@ -553,7 +547,7 @@ function render() {
         <span class="target-label">TARGET</span>
         <span class="target-num">${MAGIC}</span>
       </div>
-      <div class="target-tip">Ranks #${diff.rankMin}–${diff.rankMax} only · sum 3 ranks to hit the target</div>
+      <div class="target-tip">Pick 3 players per stat whose all-time ranks sum to this number</div>
     </div>
 
     ${S.error ? `<div class="info-bar err">${esc(S.error)}</div>` : ''}
@@ -677,19 +671,8 @@ function doSelect(ri, ci, name) {
   const key     = name.toLowerCase();
   const result  = IDX[statKey][key] || null;
 
-  const diff = DIFFICULTIES[S.difficulty];
   if (!result) {
     S.error = `"${name}" not found for ${TODAY_CATS[ri].label} — try another player`;
-    S.active    = [ri, ci];
-    S.acQuery   = name;
-    S.acResults = filterPlayers(name, statKey);
-    render(); return;
-  }
-
-  // Rank window check
-  if (result.rank < diff.rankMin || result.rank > diff.rankMax) {
-    const mode = DIFFICULTIES[S.difficulty].label;
-    S.error = `${name} is rank #${result.rank} — ${mode} mode uses ranks ${diff.rankMin}–${diff.rankMax}`;
     S.active    = [ri, ci];
     S.acQuery   = name;
     S.acResults = filterPlayers(name, statKey);
