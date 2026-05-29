@@ -197,6 +197,11 @@
     }
     .score-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
     .score-tip { font-size: 12px; color: var(--text3); text-align: center; }
+    .percentile {
+      font-size: 12px; color: var(--text2); margin-top: 5px;
+      padding-top: 5px; border-top: 1px solid var(--border);
+    }
+    .percentile b { color: var(--gold); }
 
     /* Share button */
     .share-btn {
@@ -341,6 +346,7 @@ let ALL_NAMES  = [];    // sorted unique player names for autocomplete
 let IDX        = {};    // IDX[statKey][name] = {rank, name, value}
 let TODAY_CATS = [];    // 3 stat objects picked by daily seed
 let LOADED     = {};    // cache of already-fetched sport data keyed by sport id
+let PERCENTILE = null;  // set after score is submitted
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GAME STATE
@@ -487,12 +493,19 @@ function render() {
       ${sumCellHTML(ri)}
     </div>`).join('');
 
+  const percentileLine = PERCENTILE !== null
+    ? `<div class="percentile">Better than <b>${PERCENTILE}%</b> of today's players</div>`
+    : PERCENTILE === 0
+      ? `<div class="percentile">Better than <b>0%</b> of today's players</div>`
+      : `<div class="percentile" style="color:var(--text3)">Calculating ranking…</div>`;
+
   const scoreBlock = score !== null ? `
     <div class="score-footer">
       <div>
         <div class="score-label">FINAL SCORE</div>
         <div class="score-num" style="color:${penColor(score)}">${score}</div>
         <div class="score-sub">${score === 0 ? '🎯 perfect game!' : 'lower is better — 0 is perfect'}</div>
+        ${percentileLine}
       </div>
       <button class="share-btn" id="share-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -502,7 +515,7 @@ function render() {
       </button>
     </div>` : `
     <div class="score-footer incomplete">
-      <span class="score-tip">Fill all 15 picks to see your score — aim for 0</span>
+      <span class="score-tip">Fill all 9 picks to see your score — aim for 0</span>
     </div>`;
 
   const sportName = SPORTS[S.sport].label;
@@ -697,11 +710,39 @@ function doSelect(ri, ci, name) {
 
   S.acQuery   = '';
   S.acResults = [];
-  render();
+
+  // If this pick just completed the whole puzzle, submit the score
+  const finalScore = totalScore();
+  if (finalScore !== null && PERCENTILE === null) {
+    render();
+    submitScore(finalScore);
+  } else {
+    render();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARE
+// ─────────────────────────────────────────────────────────────────────────────
+// SCORE SUBMISSION
+// ─────────────────────────────────────────────────────────────────────────────
+async function submitScore(score) {
+  const d    = new Date();
+  const date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  try {
+    const res = await fetch('/api/score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, sport: S.sport, difficulty: S.difficulty, score }),
+    });
+    const data = await res.json();
+    PERCENTILE = data.percentile ?? null;
+  } catch {
+    PERCENTILE = null;
+  }
+  render();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 function doShare() {
   const dt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -732,6 +773,7 @@ async function switchSport(sportId) {
   S.sport   = sportId;
   S.guesses = Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null));
   S.active  = null; S.acQuery = ''; S.acResults = []; S.error = '';
+  PERCENTILE = null;
   await loadSport(sportId);
 }
 
@@ -806,6 +848,7 @@ async function switchDifficulty(diffId) {
   S.difficulty = diffId;
   S.guesses    = Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null));
   S.active     = null; S.acQuery = ''; S.acResults = []; S.error = '';
+  PERCENTILE   = null;
   // Re-derive MAGIC for this difficulty using the already-loaded sport seed
   const sportOffset = S.sport === 'mlb' ? 0 : 99991;
   const rnd = mulberry32(dailySeed() + sportOffset);

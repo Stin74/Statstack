@@ -6,9 +6,17 @@
     "enabled": true
   },
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS"
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "statstack-scores",
+      "database_id": "REPLACE_WITH_DATABASE_ID"
+    }
   ]
 }
