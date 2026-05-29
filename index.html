@@ -259,10 +259,11 @@ const STATS = [
   { key: 'pitcher_w', label: 'Pitcher Wins',     file: 'data/pitcher_w.json' },
 ];
 
-// Magic number seeded range — works great once Lahman data gives ~1,000 players
+// Magic number seeded range — 1,500 players per category
 const MAGIC_MIN   = 300;   // e.g. target #1+#100+#200 area
-const MAGIC_MAX   = 900;   // requires knowing rank #300+ players
+const MAGIC_MAX   = 1200;  // requires knowing rank #400+ players
 const MAGIC_STEP  = 25;    // rounds to clean numbers
+const DAILY_CATS  = 3;     // how many categories to show each day
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RNG (mulberry32)
@@ -285,16 +286,17 @@ function dailySeed() {
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA (populated by init())
 // ─────────────────────────────────────────────────────────────────────────────
-let MAGIC     = 0;
-let ALL_NAMES = [];    // sorted unique player names for autocomplete
-let IDX       = {};    // IDX[statKey]['barry bonds'] = {rank, name, value}
+let MAGIC      = 0;
+let ALL_NAMES  = [];    // sorted unique player names for autocomplete
+let IDX        = {};    // IDX[statKey]['barry bonds'] = {rank, name, value}
+let TODAY_CATS = [];    // 3 stat objects picked by daily seed
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GAME STATE
 // ─────────────────────────────────────────────────────────────────────────────
 const S = {
   // guesses[row][col] = {name, rank, value} or null
-  guesses: Array(5).fill(null).map(() => Array(3).fill(null)),
+  guesses: Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null)),
   active:  null,   // [rowIdx, colIdx]
   acQuery: '',
   acResults: [],
@@ -418,7 +420,7 @@ function render() {
   const dt    = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const score = totalScore();
 
-  const rows = STATS.map((stat, ri) => `
+  const rows = TODAY_CATS.map((stat, ri) => `
     <div class="row">
       <div class="row-label">${esc(stat.label)}</div>
       ${[0, 1, 2].map(ci => `<div class="cell">${cellHTML(ri, ci)}</div>`).join('')}
@@ -593,12 +595,12 @@ function doSelect(ri, ci, name) {
   }
 
   // Rank lookup (instant — no network call)
-  const statKey = STATS[ri].key;
+  const statKey = TODAY_CATS[ri].key;
   const key     = name.toLowerCase();
   const result  = IDX[statKey][key] || null;
 
   if (!result) {
-    S.error = `"${name}" is not in the top ${Object.keys(IDX[statKey]).length} for ${STATS[ri].label} — try another player`;
+    S.error = `"${name}" is not in the top ${Object.keys(IDX[statKey]).length} for ${TODAY_CATS[ri].label} — try another player`;
     S.active    = [ri, ci];
     S.acQuery   = name;
     S.acResults = filterPlayers(name);
@@ -631,7 +633,7 @@ function doSelect(ri, ci, name) {
 // ─────────────────────────────────────────────────────────────────────────────
 function doShare() {
   const dt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const rows = STATS.map((stat, ri) => {
+  const rows = TODAY_CATS.map((stat, ri) => {
     const p = rowPenalty(ri);
     return `${stat.label}: ${p !== null ? penEmoji(p) : '⬜'} ±${p ?? '?'}`;
   }).join('\n');
@@ -672,8 +674,17 @@ async function init() {
     });
     ALL_NAMES = [...nameSet].sort((a, b) => a.localeCompare(b));
 
-    // Seed today's magic number (same for every player on a given date)
+    // Seed today's categories + magic number (same for every player on a given date)
     const rnd  = mulberry32(dailySeed());
+
+    // Pick DAILY_CATS categories by shuffling with the seeded RNG
+    const pool = [...STATS];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    TODAY_CATS = pool.slice(0, DAILY_CATS);
+
     const steps = Math.floor((MAGIC_MAX - MAGIC_MIN) / MAGIC_STEP);
     MAGIC = MAGIC_MIN + Math.round(rnd() * steps) * MAGIC_STEP;
 
@@ -685,7 +696,7 @@ async function init() {
         <div style="font-size:32px">⚠️</div>
         <div class="error-msg">
           <strong>Could not load game data.</strong><br><br>
-          Make sure the <code>data/</code> folder contains the five JSON files.<br>
+          Make sure the <code>data/</code> folder contains the JSON files.<br>
           Run <code>python build_data.py</code> to generate them.
         </div>
         <div style="font-size:12px;color:var(--text3);margin-top:8px">${err.message}</div>
