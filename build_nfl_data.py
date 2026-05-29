@@ -211,7 +211,9 @@ def leaders_to_records(leaders: list[dict], names: dict[str, str]) -> list[dict]
 def main() -> None:
     print("Fetching ESPN all-time NFL career leaders...")
 
-    # ── Step 1: fetch all leader lists ──────────────────────────────────────
+    # ── Step 1: fetch ESPN all-time leader lists (offense + sacks) ─────────────
+    # NOTE: ESPN defensive INT data is incomplete (missing pre-1999 players),
+    # so we source that separately from nflverse which is accurate for 1999+.
     categories = {
         "passingYards":      "nfl_pass_yds.json",
         "passingTouchdowns": "nfl_pass_td.json",
@@ -219,7 +221,6 @@ def main() -> None:
         "rushingTouchdowns": "nfl_rush_td.json",
         "receptions":        "nfl_receptions.json",
         "sacks":             "nfl_sacks.json",
-        "interceptions":     "nfl_def_int.json",
     }
 
     leader_data: dict[str, list[dict]] = {}
@@ -243,8 +244,8 @@ def main() -> None:
 
     names = resolve_names(list(all_ids))
 
-    # ── Step 3: build and save the 7 standard leader JSONs ──────────────────
-    print("\nBuilding and saving leader files...")
+    # ── Step 3: build and save the 6 ESPN leader JSONs ──────────────────────
+    print("\nBuilding and saving ESPN leader files...")
     for cat_name, filename in categories.items():
         records = leaders_to_records(leader_data[cat_name], names)
         save_json(records, f"{OUT_DIR}/{filename}")
@@ -254,6 +255,34 @@ def main() -> None:
     rec_yds_records, rec_td_records = build_receiving_leaders(rec_leaders, names)
     save_json(rec_yds_records, f"{OUT_DIR}/nfl_rec_yds.json")
     save_json(rec_td_records,  f"{OUT_DIR}/nfl_rec_td.json")
+
+    # ── Step 5: defensive INTs from nflverse (1999–present, accurate) ────────
+    print("\nBuilding defensive INTs from nflverse (1999+)...")
+    import pandas as pd
+    NFLVERSE_BASE = "https://github.com/nflverse/nflverse-data/releases/download/player_stats/"
+    frames = []
+    for year in range(1999, 2025):
+        url = NFLVERSE_BASE + f"player_stats_def_season_{year}.csv"
+        try:
+            df = pd.read_csv(url, low_memory=False)
+            df = df[df["season_type"] == "REG"]
+            frames.append(df)
+            print(".", end="", flush=True)
+        except Exception:
+            pass
+    print()
+    defense = pd.concat(frames, ignore_index=True)
+    totals = (
+        defense.groupby("player_display_name")["def_interceptions"]
+        .sum()
+        .reset_index()
+        .rename(columns={"def_interceptions": "value", "player_display_name": "name"})
+    )
+    totals = totals[totals["value"] >= 1].sort_values("value", ascending=False).head(TOP_N).reset_index(drop=True)
+    totals["rank"] = totals.index + 1
+    totals["value"] = totals["value"].astype(int)
+    def_int_records = totals[["rank", "name", "value"]].to_dict("records")
+    save_json(def_int_records, f"{OUT_DIR}/nfl_def_int.json")
 
     print(f"\nDone. Nine NFL JSON files written to ./{OUT_DIR}/")
 
