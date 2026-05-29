@@ -235,22 +235,27 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { display: inline-block; animation: spin .8s linear infinite; }
 
-    /* ── Sport toggle ───────────────────────────── */
-    .sport-toggle {
+    /* ── Toggles (sport + difficulty) ──────────── */
+    .toggles-row {
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .sport-toggle, .diff-toggle {
       display: flex; gap: 4px;
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 99px; padding: 3px;
     }
-    .sport-btn {
+    .sport-btn, .diff-btn {
       font-family: var(--font-cond); font-size: 12px; font-weight: 600;
       letter-spacing: 1px; text-transform: uppercase;
       padding: 4px 12px; border-radius: 99px; border: none;
       cursor: pointer; transition: background .15s, color .15s;
       background: transparent; color: var(--text2);
     }
-    .sport-btn.active {
+    .sport-btn.active, .diff-btn.active {
       background: var(--surface2); color: var(--text);
     }
+    .diff-btn[data-diff="hard"].active { color: var(--orange); }
 
     /* Desktop: a little more breathing room */
     @media (min-width: 540px) {
@@ -302,11 +307,13 @@ const SPORTS = {
   },
 };
 
-// Magic number seeded range — 1,500 players per category
-const MAGIC_MIN   = 300;
-const MAGIC_MAX   = 1200;
-const MAGIC_STEP  = 25;
 const DAILY_CATS  = 3;
+
+// Difficulty settings — rank window players must fall within, and matching target range
+const DIFFICULTIES = {
+  normal: { label: 'Normal', rankMin: 6,   rankMax: 150,  magicMin: 150,  magicMax: 400,  magicStep: 25,  seed: 0     },
+  hard:   { label: 'Hard',   rankMin: 150,  rankMax: 750,  magicMin: 600,  magicMax: 1800, magicStep: 50,  seed: 55555 },
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RNG (mulberry32)
@@ -339,7 +346,8 @@ let LOADED     = {};    // cache of already-fetched sport data keyed by sport id
 // GAME STATE
 // ─────────────────────────────────────────────────────────────────────────────
 const S = {
-  sport:    'mlb',  // active sport
+  sport:      'mlb',
+  difficulty: 'normal',
   guesses: Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null)),
   active:  null,
   acQuery: '',
@@ -392,10 +400,16 @@ function penEmoji(pen) {
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTOCOMPLETE
 // ─────────────────────────────────────────────────────────────────────────────
-function filterPlayers(query, limit = 6) {
+function filterPlayers(query, statKey, limit = 6) {
   if (!query || query.length < 2) return [];
-  const q = query.toLowerCase();
-  return ALL_NAMES.filter(n => n.toLowerCase().includes(q)).slice(0, limit);
+  const q    = query.toLowerCase();
+  const diff = DIFFICULTIES[S.difficulty];
+  return ALL_NAMES.filter(n => {
+    if (!n.toLowerCase().includes(q)) return false;
+    const entry = IDX[statKey]?.[n.toLowerCase()];
+    if (!entry) return false;
+    return entry.rank >= diff.rankMin && entry.rank <= diff.rankMax;
+  }).slice(0, limit);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -503,8 +517,8 @@ function render() {
       <b>How to play:</b>
       <ul>
         <li>Each row is an all-time ${sportName} stat category.</li>
-        <li>Pick <b>3 players</b> whose all-time career ranks <b>sum as close to <span class="eg">${MAGIC}</span> as possible</b>.</li>
-        <li>Example: if you pick the <b>#1</b>, <b>#150</b>, and <b>#300</b> all-time leaders, your sum is 451.</li>
+        <li>Pick <b>3 players</b> (ranks #${diff.rankMin}–${diff.rankMax}) whose career ranks <b>sum as close to <span class="eg">${MAGIC}</span> as possible</b>.</li>
+        <li>Example: in Normal mode, if you pick ranks <b>#20</b>, <b>#60</b>, and <b>#100</b>, your sum is 180.</li>
         <li>Your score for each row is how far off you are from the target (<b>±difference</b>).</li>
         <li>Your <b>final score</b> is the total of all row penalties — <b>lower is better, 0 is perfect</b>.</li>
         <li>Click a filled pick to clear it and try someone else.</li>
@@ -512,17 +526,23 @@ function render() {
       </ul>
     </div>` : '';
 
-  const toggleBtns = Object.entries(SPORTS).map(([id, sp]) =>
+  const sportBtns = Object.entries(SPORTS).map(([id, sp]) =>
     `<button class="sport-btn${S.sport === id ? ' active' : ''}" data-sport="${id}">${sp.label}</button>`
   ).join('');
+  const diffBtns = Object.entries(DIFFICULTIES).map(([id, d]) =>
+    `<button class="diff-btn${S.difficulty === id ? ' active' : ''}" data-diff="${id}">${d.label}</button>`
+  ).join('');
+  const diff = DIFFICULTIES[S.difficulty];
 
   document.getElementById('app').innerHTML = `
     <div class="header">
       <div class="logo">STAT<span>STACK</span></div>
-      <div class="header-right">
-        <div class="sport-toggle">${toggleBtns}</div>
-        <span class="date-label">${dt}</span>
-      </div>
+      <span class="date-label">${dt}</span>
+    </div>
+
+    <div class="toggles-row">
+      <div class="sport-toggle">${sportBtns}</div>
+      <div class="diff-toggle">${diffBtns}</div>
     </div>
 
     <button class="howto-toggle" id="howto-btn">${S.howtoOpen ? 'Hide instructions' : 'How to play'}</button>
@@ -533,7 +553,7 @@ function render() {
         <span class="target-label">TARGET</span>
         <span class="target-num">${MAGIC}</span>
       </div>
-      <div class="target-tip">Pick 3 players per stat whose all-time ranks sum to this number</div>
+      <div class="target-tip">Ranks #${diff.rankMin}–${diff.rankMax} only · sum 3 ranks to hit the target</div>
     </div>
 
     ${S.error ? `<div class="info-bar err">${esc(S.error)}</div>` : ''}
@@ -560,9 +580,10 @@ function bindPost() {
   // Re-attach input listeners (input element is recreated on each render)
   const inp = document.getElementById('ai');
   if (inp) {
+    const activeStatKey = S.active ? TODAY_CATS[S.active[0]].key : null;
     inp.addEventListener('input', e => {
       S.acQuery   = e.target.value;
-      S.acResults = filterPlayers(S.acQuery);
+      S.acResults = filterPlayers(S.acQuery, activeStatKey);
       S.acIdx     = -1;
       render();
     });
@@ -626,7 +647,7 @@ document.getElementById('app').addEventListener('click', e => {
     S.guesses[ri][ci] = null;
     S.active    = [ri, ci];
     S.acQuery   = old ? old.name : '';
-    S.acResults = old ? filterPlayers(old.name) : [];
+    S.acResults = old ? filterPlayers(old.name, TODAY_CATS[ri].key) : [];
     S.acIdx     = -1;
     S.error     = '';
     render(); return;
@@ -656,11 +677,22 @@ function doSelect(ri, ci, name) {
   const key     = name.toLowerCase();
   const result  = IDX[statKey][key] || null;
 
+  const diff = DIFFICULTIES[S.difficulty];
   if (!result) {
-    S.error = `"${name}" is not in the top ${Object.keys(IDX[statKey]).length} for ${TODAY_CATS[ri].label} — try another player`;
+    S.error = `"${name}" not found for ${TODAY_CATS[ri].label} — try another player`;
     S.active    = [ri, ci];
     S.acQuery   = name;
-    S.acResults = filterPlayers(name);
+    S.acResults = filterPlayers(name, statKey);
+    render(); return;
+  }
+
+  // Rank window check
+  if (result.rank < diff.rankMin || result.rank > diff.rankMax) {
+    const mode = DIFFICULTIES[S.difficulty].label;
+    S.error = `${name} is rank #${result.rank} — ${mode} mode uses ranks ${diff.rankMin}–${diff.rankMax}`;
+    S.active    = [ri, ci];
+    S.acQuery   = name;
+    S.acResults = filterPlayers(name, statKey);
     render(); return;
   }
 
@@ -774,9 +806,33 @@ async function loadSport(sportId) {
   }
   TODAY_CATS = pool.slice(0, DAILY_CATS);
 
-  const steps = Math.floor((MAGIC_MAX - MAGIC_MIN) / MAGIC_STEP);
-  MAGIC = MAGIC_MIN + Math.round(rnd() * steps) * MAGIC_STEP;
+  setMagic(rnd);
+  render();
+}
 
+function setMagic(rnd) {
+  const diff  = DIFFICULTIES[S.difficulty];
+  // Consume a few rng calls so difficulty offset changes the number
+  for (let i = 0; i < diff.seed % 7; i++) rnd();
+  const steps = Math.floor((diff.magicMax - diff.magicMin) / diff.magicStep);
+  MAGIC = diff.magicMin + Math.round(rnd() * steps) * diff.magicStep;
+}
+
+async function switchDifficulty(diffId) {
+  if (diffId === S.difficulty) return;
+  S.difficulty = diffId;
+  S.guesses    = Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null));
+  S.active     = null; S.acQuery = ''; S.acResults = []; S.error = '';
+  // Re-derive MAGIC for this difficulty using the already-loaded sport seed
+  const sportOffset = S.sport === 'mlb' ? 0 : 99991;
+  const rnd = mulberry32(dailySeed() + sportOffset);
+  const pool = [...SPORTS[S.sport].stats];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  TODAY_CATS = pool.slice(0, DAILY_CATS);
+  setMagic(rnd);
   render();
 }
 
@@ -789,6 +845,8 @@ async function init() {
 document.getElementById('app').addEventListener('click', e => {
   const sb = e.target.closest('.sport-btn');
   if (sb && sb.dataset.sport) { switchSport(sb.dataset.sport); return; }
+  const db = e.target.closest('.diff-btn');
+  if (db && db.dataset.diff) { switchDifficulty(db.dataset.diff); return; }
 }, true);  // capture phase so it fires before other handlers
 
 // Kick off
