@@ -452,11 +452,19 @@ function sumCellHTML(ri) {
   const sum = rowSum(ri);
   const pen = rowPenalty(ri);
   const color = pen !== null ? penColor(pen) : 'var(--blue)';
+
+  // While the row is still incomplete, show how much rank is still needed
+  let subLine;
+  if (pen !== null) {
+    subLine = `±${pen}`;
+  } else {
+    const need = MAGIC - sum;
+    subLine = need > 0 ? `need ~${need}` : `over by ${Math.abs(need)}`;
+  }
+
   return `<div class="sum-cell">
     <div class="sum-num" style="color:${color}">${sum}</div>
-    <div class="sum-pen" style="color:${color}">
-      ${pen !== null ? `±${pen}` : `${3 - filled} left`}
-    </div>
+    <div class="sum-pen" style="color:${color}">${subLine}</div>
   </div>`;
 }
 
