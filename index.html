@@ -293,21 +293,22 @@ const SPORTS = {
       { key: 'hits',      label: 'Career Hits',    file: 'data/hits.json' },
       { key: 'pitcher_k', label: 'Pitcher Ks',     file: 'data/pitcher_k.json' },
       { key: 'pitcher_w', label: 'Pitcher Wins',   file: 'data/pitcher_w.json' },
+      { key: 'sb',        label: 'Stolen Bases',   file: 'data/sb.json' },
+      { key: 'saves',     label: 'Saves',          file: 'data/saves.json' },
     ],
   },
   nfl: {
     label: '🏈 NFL',
     emoji: '🏈',
     stats: [
-      { key: 'nfl_pass_yds',    label: 'Pass Yards',   file: 'data/nfl_pass_yds.json' },
-      { key: 'nfl_pass_td',    label: 'Pass TDs',     file: 'data/nfl_pass_td.json' },
-      { key: 'nfl_rush_yds',   label: 'Rush Yards',   file: 'data/nfl_rush_yds.json' },
-      { key: 'nfl_rush_td',    label: 'Rush TDs',     file: 'data/nfl_rush_td.json' },
-      { key: 'nfl_receptions', label: 'Receptions',   file: 'data/nfl_receptions.json' },
-      { key: 'nfl_rec_yds',    label: 'Rec Yards',    file: 'data/nfl_rec_yds.json' },
-      { key: 'nfl_rec_td',     label: 'Rec TDs',      file: 'data/nfl_rec_td.json' },
-      { key: 'nfl_sacks',      label: 'Sacks',        file: 'data/nfl_sacks.json' },
-      { key: 'nfl_def_int',    label: 'Def INTs (99+)', file: 'data/nfl_def_int.json' },
+      { key: 'nfl_pass_yds',    label: 'Pass Yards',  file: 'data/nfl_pass_yds.json' },
+      { key: 'nfl_pass_td',     label: 'Pass TDs',    file: 'data/nfl_pass_td.json' },
+      { key: 'nfl_rush_yds',    label: 'Rush Yards',  file: 'data/nfl_rush_yds.json' },
+      { key: 'nfl_rush_td',     label: 'Rush TDs',    file: 'data/nfl_rush_td.json' },
+      { key: 'nfl_receptions',  label: 'Receptions',  file: 'data/nfl_receptions.json' },
+      { key: 'nfl_rec_td',      label: 'Rec TDs',     file: 'data/nfl_rec_td.json' },
+      { key: 'nfl_sacks',       label: 'Sacks',       file: 'data/nfl_sacks.json' },
+      { key: 'nfl_def_int',     label: 'Def INTs',    file: 'data/nfl_def_int.json' },
     ],
   },
 };
@@ -529,7 +530,7 @@ function render() {
         <li>Your score for each row is how far off you are from the target (<b>±difference</b>).</li>
         <li>Your <b>final score</b> is the total of all row penalties — <b>lower is better, 0 is perfect</b>.</li>
         <li>Click a filled pick to clear it and try someone else.</li>
-        <li>Rankings refresh nightly. NFL stats cover the 1999–present era.</li>
+        <li>Rankings are all-time career totals sourced from Stathead.</li>
       </ul>
     </div>` : '';
 
