@@ -311,6 +311,18 @@ const SPORTS = {
       { key: 'nfl_def_int',     label: 'Def INTs',    file: 'data/nfl_def_int.json' },
     ],
   },
+  nba: {
+    label: '🏀 NBA',
+    emoji: '🏀',
+    stats: [
+      { key: 'nba_points',   label: 'Points',    file: 'data/nba_points.json' },
+      { key: 'nba_rebounds', label: 'Rebounds',  file: 'data/nba_rebounds.json' },
+      { key: 'nba_assists',  label: 'Assists',   file: 'data/nba_assists.json' },
+      { key: 'nba_steals',   label: 'Steals',    file: 'data/nba_steals.json' },
+      { key: 'nba_blocks',   label: 'Blocks',    file: 'data/nba_blocks.json' },
+      { key: 'nba_3pm',      label: '3-Pointers', file: 'data/nba_3pm.json' },
+    ],
+  },
 };
 
 const DAILY_CATS  = 3;
@@ -855,7 +867,7 @@ async function loadSport(sportId) {
   ALL_NAMES = LOADED[sportId].names;
 
   // Each sport gets its own seeded seed offset so the category picks differ
-  const sportOffset = sportId === 'mlb' ? 0 : 99991;
+  const sportOffset = { mlb: 0, nfl: 99991, nba: 199982 }[sportId] ?? 0;
   const rnd = mulberry32(dailySeed() + sportOffset);
 
   const pool = [...sport.stats];
@@ -885,7 +897,7 @@ async function switchDifficulty(diffId) {
   PERCENTILE   = null;
   saveState();
   // Re-derive MAGIC for this difficulty using the already-loaded sport seed
-  const sportOffset = S.sport === 'mlb' ? 0 : 99991;
+  const sportOffset = { mlb: 0, nfl: 99991, nba: 199982 }[S.sport] ?? 0;
   const rnd = mulberry32(dailySeed() + sportOffset);
   const pool = [...SPORTS[S.sport].stats];
   for (let i = pool.length - 1; i > 0; i--) {
