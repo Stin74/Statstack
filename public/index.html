@@ -759,7 +759,7 @@ function doShare() {
   }).join('\n');
 
   const diffTag = S.difficulty === 'hard' ? ' (Hard)' : '';
-  const text = `StatStack ${sportLabel}${diffTag}\n${dt}\n\n${rows}\n\nstatstack.game`;
+  const text = `StatStack ${sportLabel}${diffTag}\n${dt}\n\n${rows}\n\nstatstack.game #statstack`;
 
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('share-btn');
