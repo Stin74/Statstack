@@ -28,7 +28,7 @@ import time
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-OUT_DIR  = "data"
+OUT_DIR  = "public/data"
 TOP_N    = 1000
 ESPN_BASE = "http://sports.core.api.espn.com/v2/sports/football/leagues/nfl"
 

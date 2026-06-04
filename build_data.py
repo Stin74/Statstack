@@ -26,7 +26,7 @@ import pandas as pd
 LAHMAN_BASE = (
     "https://raw.githubusercontent.com/cbwinslow/baseballdatabank/master/core/"
 )
-OUT_DIR = "data"
+OUT_DIR = "public/data"
 TOP_N = 1500
 
 
