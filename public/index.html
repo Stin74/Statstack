@@ -10,9 +10,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
-  <!-- Google AdSense -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3681680541742508"
-     crossorigin="anonymous"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -39,11 +36,6 @@
 
     html { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
     body { min-height: 100dvh; }
-
-    /* ── Ad Container ──────────────────────────────────── */
-    #ad-container {
-      display: flex; justify-content: center; margin-bottom: 12px;
-    }
 
     /* ── Layout ─────────────────────────────────── */
     #app   { max-width: 520px; margin: 0 auto; padding: 14px 12px 20px; }
@@ -281,16 +273,6 @@
   </style>
 </head>
 <body>
-<div id="ad-container">
-  <!-- Google AdSense ad will be inserted here -->
-  <ins class="adsbygoogle"
-       style="display:inline-block"
-       data-ad-client="ca-pub-3681680541742508"
-       data-ad-slot="5009120415"
-       data-ad-format="auto"
-       data-full-width-responsive="true"></ins>
-</div>
-
 <div id="app">
   <div id="loading">
     <div class="spin" style="font-size:28px;color:var(--gold)">⚾</div>
@@ -791,8 +773,6 @@ function doSelect(ri, ci, name) {
 }
 
 // ────────────────────────────────────────────────────────────────[...]
-// SHARE
-// ────────────────────────────────────────────────────────────────[...]
 // SCORE SUBMISSION
 // ────────────────────────────────────────────────────────────────[...]
 async function submitScore(score) {
@@ -813,6 +793,8 @@ async function submitScore(score) {
 }
 
 // ────────────────────────────────────────────────────────────────[...]
+// SHARE
+// ────────────────────────────────────────────────────────────────[...]
 function doShare() {
   const dt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const sportLabel = SPORTS[S.sport].label;
@@ -832,7 +814,7 @@ function doShare() {
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('share-btn');
     if (btn) {
-      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied![...]
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
       setTimeout(() => render(), 2200);
     }
   }).catch(() => {
@@ -885,7 +867,7 @@ async function loadSport(sportId) {
           <div class="error-msg">
             <strong>Could not load game data.</strong><br><br>
             Make sure the <code>data/</code> folder contains the JSON files.<br>
-            Run <code>python build_data.py</code> and <code>python build_nfl_data.py</code> to generate them.
+            Run <code>python build_data.py</code> to generate them.
           </div>
           <div style="font-size:12px;color:var(--text3);margin-top:8px">${err.message}</div>
         </div>`;
@@ -953,14 +935,7 @@ document.getElementById('app').addEventListener('click', e => {
   if (db && db.dataset.diff) { switchDifficulty(db.dataset.diff); return; }
 }, true);  // capture phase so it fires before other handlers
 
-// Initialize AdSense after DOM is ready
-window.addEventListener('load', () => {
-  if (typeof adsbygoogle !== 'undefined') {
-    (adsbygoogle = window.adsbygoogle || []).push({});
-  }
-});
-
-// Kick off the game
+// Kick off
 init();
 </script>
 </body>
