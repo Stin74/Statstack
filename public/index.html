@@ -529,7 +529,6 @@ function render() {
         <li>Example: if you pick the <b>#1</b>, <b>#20</b>, and <b>#50</b> all-time leaders, your sum is 71.</li>
         <li>Your score for each row is how far off you are from the target (<b>±difference</b>).</li>
         <li>Your <b>final score</b> is the total of all row penalties — <b>lower is better, 0 is perfect</b>.</li>
-        <li>Click a filled pick to clear it and try someone else.</li>
         <li>Rankings are all-time career totals sourced from Stathead.</li>
       </ul>
     </div>` : '';
@@ -647,9 +646,9 @@ document.getElementById('app').addEventListener('click', e => {
     render(); return;
   }
 
-  // Chip click (clear + re-edit)
+  // Chip click — disabled (selections are final)
   const cp = e.target.closest('.chip');
-  if (cp && cp.dataset.cr !== undefined) {
+  if (false && cp && cp.dataset.cr !== undefined) { // selections locked
     const ri = +cp.dataset.cr, ci = +cp.dataset.cc;
     const old = S.guesses[ri][ci];
     S.guesses[ri][ci] = null;
