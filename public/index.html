@@ -323,6 +323,17 @@ const SPORTS = {
       { key: 'nba_3pm',      label: '3-Pointers', file: 'data/nba_3pm.json' },
     ],
   },
+  nhl: {
+    label: '🏒 NHL',
+    emoji: '🏒',
+    stats: [
+      { key: 'nhl_goals',        label: 'Goals',        file: 'data/nhl_goals.json' },
+      { key: 'nhl_assists',      label: 'Assists',      file: 'data/nhl_assists.json' },
+      { key: 'nhl_points',       label: 'Points',       file: 'data/nhl_points.json' },
+      { key: 'nhl_goalie_saves', label: 'Goalie Saves', file: 'data/nhl_goalie_saves.json' },
+      { key: 'nhl_goalie_wins',  label: 'Goalie Wins',  file: 'data/nhl_goalie_wins.json' },
+    ],
+  },
 };
 
 const DAILY_CATS  = 3;
@@ -867,7 +878,7 @@ async function loadSport(sportId) {
   ALL_NAMES = LOADED[sportId].names;
 
   // Each sport gets its own seeded seed offset so the category picks differ
-  const sportOffset = { mlb: 0, nfl: 99991, nba: 199982 }[sportId] ?? 0;
+  const sportOffset = { mlb: 0, nfl: 99991, nba: 199982, nhl: 299973 }[sportId] ?? 0;
   const rnd = mulberry32(dailySeed() + sportOffset);
 
   const pool = [...sport.stats];
