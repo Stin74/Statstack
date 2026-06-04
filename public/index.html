@@ -170,7 +170,7 @@
       width: 100%; aspect-ratio: 1; padding: 4px 6px;
       border-radius: var(--radius); border: 1.5px solid var(--blue);
       background: var(--surface2); color: var(--text);
-      font-family: var(--font-body); font-size: 11px;
+      font-family: var(--font-body); font-size: 16px;
       outline: none; text-align: center;
     }
     .iw input::placeholder { color: var(--text3); }
@@ -279,6 +279,7 @@
       .target-num { font-size: 36px; }
       .chip-name  { font-size: 10px; }
       .score-num  { font-size: 44px; }
+      .iw input { font-size: 11px; }
     }
   </style>
 </head>
@@ -291,9 +292,9 @@
 </div>
 
 <script>
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // CONFIG
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 const SPORTS = {
   mlb: {
     label: '⚾ MLB',
@@ -355,9 +356,9 @@ const DIFFICULTIES = {
   hard:   { label: 'Hard',   rankMin: 151, rankMax: 750, magicMin: 151, magicMax: 750, magicStep: 1,  seed: 55555 },
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // RNG (mulberry32)
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function mulberry32(seed) {
   let s = seed | 0;
   return () => {
@@ -373,9 +374,9 @@ function dailySeed() {
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // DATA (populated by init() / switchSport())
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 let MAGIC      = 0;
 let ALL_NAMES  = [];    // sorted unique player names for autocomplete
 let IDX        = {};    // IDX[statKey][name] = {rank, name, value}
@@ -383,9 +384,9 @@ let TODAY_CATS = [];    // 3 stat objects picked by daily seed
 let LOADED     = {};    // cache of already-fetched sport data keyed by sport id
 let PERCENTILE = null;  // set after score is submitted
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // LOCAL STORAGE — persist today's state across page reloads
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 const STORAGE_KEY = `statstack_v1_${dailySeed()}`;
 
 function saveState() {
@@ -409,9 +410,9 @@ function loadState() {
   } catch (_) {}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // GAME STATE
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 const S = {
   sport:      'mlb',
   difficulty: 'normal',
@@ -424,9 +425,9 @@ const S = {
   howtoOpen: false,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // SCORING
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function rowSum(ri) {
   return S.guesses[ri].reduce((a, g) => a + (g ? g.rank : 0), 0);
 }
@@ -464,18 +465,18 @@ function penEmoji(pen) {
   return '🟥';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // AUTOCOMPLETE
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function filterPlayers(query, statKey, limit = 6) {
   if (!query || query.length < 2) return [];
   const q = query.toLowerCase();
   return ALL_NAMES.filter(n => n.toLowerCase().includes(q)).slice(0, limit);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -484,9 +485,9 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // RENDER
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function cellHTML(ri, ci) {
   const g     = S.guesses[ri][ci];
   const isAct = S.active && S.active[0] === ri && S.active[1] === ci;
@@ -687,9 +688,9 @@ function bindPost() {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // EVENT DELEGATION (attached once)
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 document.getElementById('app').addEventListener('click', e => {
   // Autocomplete item click
   const ac = e.target.closest('[data-ac]');
@@ -726,9 +727,9 @@ document.getElementById('app').addEventListener('click', e => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // SELECT PLAYER (instant lookup — no API)
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function doSelect(ri, ci, name) {
   if (!name) return;
   name = name.trim();
@@ -782,11 +783,11 @@ function doSelect(ri, ci, name) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // SHARE
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // SCORE SUBMISSION
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 async function submitScore(score) {
   const d    = new Date();
   const date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -804,7 +805,7 @@ async function submitScore(score) {
   render();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function doShare() {
   const dt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const sportLabel = SPORTS[S.sport].label;
@@ -824,7 +825,7 @@ function doShare() {
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('share-btn');
     if (btn) {
-      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied![...]
       setTimeout(() => render(), 2200);
     }
   }).catch(() => {
@@ -832,9 +833,9 @@ function doShare() {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // SPORT SWITCH
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 async function switchSport(sportId) {
   if (sportId === S.sport) return;
   S.sport   = sportId;
@@ -845,9 +846,9 @@ async function switchSport(sportId) {
   await loadSport(sportId);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // INIT — load JSON files for the active sport, then start the game
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 async function loadSport(sportId) {
   const sport = SPORTS[sportId];
 
