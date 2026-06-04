@@ -1,8 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3681680541742508"
-     crossorigin="anonymous"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StatStack — Daily Baseball Puzzle</title>
@@ -12,6 +10,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Google AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3681680541742508"
+     crossorigin="anonymous"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -38,16 +39,12 @@
 
     html { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
     body { min-height: 100dvh; }
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3681680541742508"
-     crossorigin="anonymous"></script>
-<!-- test -->
-<ins class="adsbygoogle"
-     style="display:inline-block;width:728px;height:90px"
-     data-ad-client="ca-pub-3681680541742508"
-     data-ad-slot="5009120415"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
+
+    /* ── Ad Container ──────────────────────────────────── */
+    #ad-container {
+      display: flex; justify-content: center; margin-bottom: 12px;
+    }
+
     /* ── Layout ─────────────────────────────────── */
     #app   { max-width: 520px; margin: 0 auto; padding: 14px 12px 20px; }
     #loading, #error-screen {
@@ -284,6 +281,16 @@
   </style>
 </head>
 <body>
+<div id="ad-container">
+  <!-- Google AdSense ad will be inserted here -->
+  <ins class="adsbygoogle"
+       style="display:inline-block"
+       data-ad-client="ca-pub-3681680541742508"
+       data-ad-slot="5009120415"
+       data-ad-format="auto"
+       data-full-width-responsive="true"></ins>
+</div>
+
 <div id="app">
   <div id="loading">
     <div class="spin" style="font-size:28px;color:var(--gold)">⚾</div>
@@ -292,6 +299,9 @@
 </div>
 
 <script>
+// Initialize AdSense
+(adsbygoogle = window.adsbygoogle || []).push({});
+
 // ────────────────────────────────────────────────────────────────[...]
 // CONFIG
 // ────────────────────────────────────────────────────────────────[...]
@@ -848,7 +858,7 @@ async function switchSport(sportId) {
 
 // ────────────────────────────────────────────────────────────────[...]
 // INIT — load JSON files for the active sport, then start the game
-// ────────────────────────────────────────────────────────────────[...]
+// ───────────────────────────────────��────────────────────────────[...]
 async function loadSport(sportId) {
   const sport = SPORTS[sportId];
 
