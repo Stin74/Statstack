@@ -350,6 +350,32 @@ let LOADED     = {};    // cache of already-fetched sport data keyed by sport id
 let PERCENTILE = null;  // set after score is submitted
 
 // ─────────────────────────────────────────────────────────────────────────────
+// LOCAL STORAGE — persist today's state across page reloads
+// ─────────────────────────────────────────────────────────────────────────────
+const STORAGE_KEY = `statstack_v1_${dailySeed()}`;
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      sport:      S.sport,
+      difficulty: S.difficulty,
+      guesses:    S.guesses,
+    }));
+  } catch (_) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved.sport)      S.sport      = saved.sport;
+    if (saved.difficulty) S.difficulty = saved.difficulty;
+    if (saved.guesses)    S.guesses    = saved.guesses;
+  } catch (_) {}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GAME STATE
 // ─────────────────────────────────────────────────────────────────────────────
 const S = {
@@ -695,6 +721,7 @@ function doSelect(ri, ci, name) {
   // Commit the pick
   S.guesses[ri][ci] = { name: result.name, rank: result.rank, value: result.value };
   S.error = '';
+  saveState();
 
   // Auto-advance: next empty cell in this row, then first empty in next rows
   const nextCol = S.guesses[ri].findIndex(g => !g);
@@ -780,6 +807,7 @@ async function switchSport(sportId) {
   S.guesses = Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null));
   S.active  = null; S.acQuery = ''; S.acResults = []; S.error = '';
   PERCENTILE = null;
+  saveState();
   await loadSport(sportId);
 }
 
@@ -855,6 +883,7 @@ async function switchDifficulty(diffId) {
   S.guesses    = Array(DAILY_CATS).fill(null).map(() => Array(3).fill(null));
   S.active     = null; S.acQuery = ''; S.acResults = []; S.error = '';
   PERCENTILE   = null;
+  saveState();
   // Re-derive MAGIC for this difficulty using the already-loaded sport seed
   const sportOffset = S.sport === 'mlb' ? 0 : 99991;
   const rnd = mulberry32(dailySeed() + sportOffset);
@@ -869,6 +898,7 @@ async function switchDifficulty(diffId) {
 }
 
 async function init() {
+  loadState();
   await loadSport(S.sport);
 }
 
