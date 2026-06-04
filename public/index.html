@@ -299,9 +299,6 @@
 </div>
 
 <script>
-// Initialize AdSense
-(adsbygoogle = window.adsbygoogle || []).push({});
-
 // ────────────────────────────────────────────────────────────────[...]
 // CONFIG
 // ────────────────────────────────────────────────────────────────[...]
@@ -858,7 +855,7 @@ async function switchSport(sportId) {
 
 // ────────────────────────────────────────────────────────────────[...]
 // INIT — load JSON files for the active sport, then start the game
-// ───────────────────────────────────��────────────────────────────[...]
+// ────────────────────────────────────────────────────────────────[...]
 async function loadSport(sportId) {
   const sport = SPORTS[sportId];
 
@@ -956,7 +953,14 @@ document.getElementById('app').addEventListener('click', e => {
   if (db && db.dataset.diff) { switchDifficulty(db.dataset.diff); return; }
 }, true);  // capture phase so it fires before other handlers
 
-// Kick off
+// Initialize AdSense after DOM is ready
+window.addEventListener('load', () => {
+  if (typeof adsbygoogle !== 'undefined') {
+    (adsbygoogle = window.adsbygoogle || []).push({});
+  }
+});
+
+// Kick off the game
 init();
 </script>
 </body>
