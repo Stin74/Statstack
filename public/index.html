@@ -826,15 +826,35 @@ function doShare() {
   const diffTag = S.difficulty === 'hard' ? ' (Hard)' : '';
   const text = `StatStack ${sportLabel}${diffTag}\n${dt}\n\n${rows}\n\nstatstackgame.com\n#statstack`;
 
-  navigator.clipboard.writeText(text).then(() => {
+  function onCopied() {
     const btn = document.getElementById('share-btn');
     if (btn) {
       btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
       setTimeout(() => render(), 2200);
     }
-  }).catch(() => {
-    alert(text);
-  });
+  }
+
+  function fallbackCopy(str) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = str;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      onCopied();
+    } catch {
+      alert(str);
+    }
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onCopied).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
 }
 
 // ────────────────────────────────────────────────────────────────[...]
