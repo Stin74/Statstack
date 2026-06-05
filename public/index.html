@@ -38,6 +38,9 @@
     html { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
     body { min-height: 100dvh; }
 
+    /* ── Total row ──────────────────────────────── */
+    .total-row { border-top: 1px solid var(--border2) !important; background: var(--surface2); }
+
     /* ── Ad banners ─────────────────────────────── */
     .ad-banner {
       width: 100%; max-width: 728px; margin: 0 auto;
@@ -359,8 +362,8 @@ const DAILY_CATS  = 3;
 
 // Difficulty settings — rank window players must fall within, and matching target range
 const DIFFICULTIES = {
-  normal: { label: 'Normal', rankMin: 6,   rankMax: 150, magicMin: 6,   magicMax: 50,  magicStep: 1,  seed: 0     },
-  hard:   { label: 'Hard',   rankMin: 151, rankMax: 750, magicMin: 51,  magicMax: 500, magicStep: 1,  seed: 55555 },
+  normal: { label: 'Normal', rankMin: 6,   rankMax: 150, magicMin: 18,  magicMax: 150, magicStep: 1,  seed: 0     },
+  hard:   { label: 'Hard',   rankMin: 151, rankMax: 750, magicMin: 153, magicMax: 1500,magicStep: 1,  seed: 55555 },
 };
 
 // ────────────────────────────────────────────────────────────────[...]
@@ -441,18 +444,17 @@ function rowSum(ri) {
 function rowFilled(ri) {
   return S.guesses[ri].every(g => g !== null);
 }
-function rowPenalty(ri) {
-  if (!rowFilled(ri)) return null;
-  return Math.abs(rowSum(ri) - MAGIC);
+function allPicksSum() {
+  let total = 0;
+  for (let i = 0; i < DAILY_CATS; i++) total += rowSum(i);
+  return total;
+}
+function allFilled() {
+  return S.guesses.every(row => row.every(g => g !== null));
 }
 function totalScore() {
-  let total = 0;
-  for (let i = 0; i < DAILY_CATS; i++) {
-    const p = rowPenalty(i);
-    if (p === null) return null;
-    total += p;
-  }
-  return total;
+  if (!allFilled()) return null;
+  return Math.abs(allPicksSum() - MAGIC);
 }
 function penColor(pen) {
   if (pen === null) return 'var(--text3)';
@@ -533,21 +535,8 @@ function sumCellHTML(ri) {
     </div>`;
   }
   const sum = rowSum(ri);
-  const pen = rowPenalty(ri);
-  const color = pen !== null ? penColor(pen) : 'var(--blue)';
-
-  // While the row is still incomplete, show how much rank is still needed
-  let subLine;
-  if (pen !== null) {
-    subLine = `±${pen}`;
-  } else {
-    const need = MAGIC - sum;
-    subLine = need > 0 ? `need ~${need}` : `over by ${Math.abs(need)}`;
-  }
-
   return `<div class="sum-cell">
-    <div class="sum-num" style="color:${color}">${sum}</div>
-    <div class="sum-pen" style="color:${color}">${subLine}</div>
+    <div class="sum-num" style="color:var(--blue)">${sum}</div>
   </div>`;
 }
 
@@ -561,6 +550,31 @@ function render() {
       ${[0, 1, 2].map(ci => `<div class="cell">${cellHTML(ri, ci)}</div>`).join('')}
       ${sumCellHTML(ri)}
     </div>`).join('');
+
+  // Running total row
+  const picksTotal = allPicksSum();
+  const picksCount = S.guesses.flat().filter(g => g).length;
+  const isDone = allFilled();
+  const totalPen = isDone ? totalScore() : null;
+  const totalColor = totalPen !== null ? penColor(totalPen) : (picksCount > 0 ? 'var(--blue)' : 'var(--text3)');
+  const need = MAGIC - picksTotal;
+  const totalSubLine = isDone
+    ? `±${totalPen}`
+    : picksCount > 0
+      ? (need > 0 ? `need ${need} more` : `over by ${Math.abs(need)}`)
+      : `target: ${MAGIC}`;
+  const totalRow = `
+    <div class="row total-row">
+      <div class="row-label" style="color:var(--text2);font-size:11px;letter-spacing:.5px;">TOTAL</div>
+      <div class="cell" style="grid-column:2/5;display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 8px;">
+        <span style="font-family:var(--font-cond);font-size:22px;font-weight:700;color:${totalColor}">${picksCount > 0 ? picksTotal : '—'}</span>
+        <span style="font-size:11px;color:${totalColor}">${totalSubLine}</span>
+      </div>
+      <div class="sum-cell">
+        <div class="sum-num" style="color:var(--text3);font-size:14px;">${MAGIC}</div>
+        <div class="sum-pen" style="color:var(--text3)">target</div>
+      </div>
+    </div>`;
 
   const percentileLine = PERCENTILE !== null
     ? `<div class="percentile">Better than <b>${PERCENTILE}%</b> of today's players</div>`
@@ -584,7 +598,7 @@ function render() {
       </button>
     </div>` : `
     <div class="score-footer incomplete">
-      <span class="score-tip">Fill all 9 picks to see your score — aim for 0</span>
+      <span class="score-tip">Fill all 9 picks — get the total as close to ${MAGIC} as possible</span>
     </div>`;
 
   const sportName = SPORTS[S.sport].label;
@@ -594,9 +608,9 @@ function render() {
       <ul>
         <li>Each row is an all-time ${sportName} stat category.</li>
         <li>Pick <b>3 players</b> whose all-time career ranks <b>sum as close to <span class="eg">${MAGIC}</span> as possible</b>.</li>
-        <li>Example: if you pick the <b>#1</b>, <b>#20</b>, and <b>#50</b> all-time leaders, your sum is 71.</li>
-        <li>Your score for each row is how far off you are from the target (<b>±difference</b>).</li>
-        <li>Your <b>final score</b> is the total of all row penalties — <b>lower is better, 0 is perfect</b>.</li>
+        <li>Example: picks ranked <b>#1</b>, <b>#20</b>, <b>#50</b>, <b>#5</b>, <b>#10</b>, <b>#30</b>, <b>#8</b>, <b>#15</b>, <b>#25</b> sum to 164.</li>
+        <li>Your <b>score</b> is how far your total is from the target — <b>lower is better, 0 is perfect</b>.</li>
+        <li>You can go over on one row and make it up on another!</li>
         <li>Rankings are all-time career totals sourced from Stathead.</li>
       </ul>
     </div>` : '';
@@ -628,7 +642,7 @@ function render() {
         <span class="target-label">TARGET</span>
         <span class="target-num">${MAGIC}</span>
       </div>
-      <div class="target-tip">Pick 3 players per stat whose all-time ranks sum to this number</div>
+      <div class="target-tip">Get all 9 picks' ranks to sum as close to this as possible</div>
     </div>
 
     ${S.error ? `<div class="info-bar err">${esc(S.error)}</div>` : ''}
@@ -643,6 +657,7 @@ function render() {
           <span>Sum</span>
         </div>
         ${rows}
+        ${totalRow}
       </div>
     </div>
 
@@ -818,13 +833,15 @@ function doShare() {
   const sportLabel = SPORTS[S.sport].label;
   const score = totalScore();
 
-  const rows = TODAY_CATS.map((stat, ri) => {
-    const p = rowPenalty(ri);
-    return `${p !== null ? penEmoji(p) : '⬜'} ${stat.label}  ±${p ?? '?'}`;
+  const shareRows = TODAY_CATS.map((stat, ri) => {
+    const sum = rowSum(ri);
+    return `${stat.label}: ${sum}`;
   }).join('\n');
 
+  const finalScore = totalScore();
+  const emoji = penEmoji(finalScore);
   const diffTag = S.difficulty === 'hard' ? ' (Hard)' : '';
-  const text = `StatStack ${sportLabel}${diffTag}\n${dt}\n\n${rows}\n\nstatstackgame.com\n#statstack`;
+  const text = `StatStack ${sportLabel}${diffTag}\n${dt}\n\n${shareRows}\nTotal: ${allPicksSum()} / ${MAGIC}  ${emoji} ±${finalScore}\n\nstatstackgame.com\n#statstack`;
 
   function onCopied() {
     const btn = document.getElementById('share-btn');
