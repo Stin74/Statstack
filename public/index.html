@@ -800,12 +800,9 @@ function doShare() {
   const sportLabel = SPORTS[S.sport].label;
   const score = totalScore();
 
-  // Pad labels so scores line up neatly
-  const maxLen = Math.max(...TODAY_CATS.map(s => s.label.length));
   const rows = TODAY_CATS.map((stat, ri) => {
     const p = rowPenalty(ri);
-    const padded = stat.label.padEnd(maxLen, ' ');
-    return `${padded}  ${p !== null ? penEmoji(p) : '⬜'} ±${p ?? '?'}`;
+    return `${p !== null ? penEmoji(p) : '⬜'} ${stat.label}  ±${p ?? '?'}`;
   }).join('\n');
 
   const diffTag = S.difficulty === 'hard' ? ' (Hard)' : '';
