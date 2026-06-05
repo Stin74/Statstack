@@ -38,6 +38,13 @@
     html { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
     body { min-height: 100dvh; }
 
+    /* ── Ad banners ─────────────────────────────── */
+    .ad-banner {
+      width: 100%; max-width: 728px; margin: 0 auto;
+      text-align: center; overflow: hidden;
+    }
+    .ad-banner ins { display: block; }
+
     /* ── Layout ─────────────────────────────────── */
     #app   { max-width: 520px; margin: 0 auto; padding: 14px 12px 20px; }
     #loading, #error-screen {
@@ -274,6 +281,16 @@
   </style>
 </head>
 <body>
+
+<!-- Top banner ad -->
+<div class="ad-banner">
+  <ins class="adsbygoogle"
+       style="display:block;width:728px;height:90px"
+       data-ad-client="ca-pub-3681680541742508"
+       data-ad-slot="5009120415"></ins>
+  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+</div>
+
 <div id="app">
   <div id="loading">
     <div class="spin" style="font-size:28px;color:var(--gold)">⚾</div>
@@ -936,5 +953,15 @@ document.getElementById('app').addEventListener('click', e => {
 // Kick off
 init();
 </script>
+
+<!-- Bottom banner ad -->
+<div class="ad-banner">
+  <ins class="adsbygoogle"
+       style="display:block;width:728px;height:90px"
+       data-ad-client="ca-pub-3681680541742508"
+       data-ad-slot="5009120415"></ins>
+  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+</div>
+
 </body>
 </html>
